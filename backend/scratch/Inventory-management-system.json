@@ -1,0 +1,2952 @@
+{
+  "v": 12,
+  "name": "Inventory-management-system",
+  "folders": [
+    {
+      "v": 12,
+      "name": "EXPENSE-CATEGORY-ROUTES",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GetALLExpenseCategories",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense-category/",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMjA6MjQ6MDkuODQ2WiIsImlhdCI6MTc4Mzg4Nzg0OSwiZXhwIjoxNzgzOTc0MjQ5fQ.igypQmMw9iVMArisdxTI-odCrGuVRZXL892g12-JTVc",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GetBYIDExpenseCategories ",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense-category/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMjA6MjQ6MDkuODQ2WiIsImlhdCI6MTc4Mzg4Nzg0OSwiZXhwIjoxNzgzOTc0MjQ5fQ.igypQmMw9iVMArisdxTI-odCrGuVRZXL892g12-JTVc",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CreateExpenseCategories",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/expense-category/",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMjA6MjQ6MDkuODQ2WiIsImlhdCI6MTc4Mzg4Nzg0OSwiZXhwIjoxNzgzOTc0MjQ5fQ.igypQmMw9iVMArisdxTI-odCrGuVRZXL892g12-JTVc",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"foods\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UpdateExpenseCategories",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/expense-category/4",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMjA6MjQ6MDkuODQ2WiIsImlhdCI6MTc4Mzg4Nzg0OSwiZXhwIjoxNzgzOTc0MjQ5fQ.igypQmMw9iVMArisdxTI-odCrGuVRZXL892g12-JTVc",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"food\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DeleteExpenseCategories",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/expense-category/4",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMjA6MjQ6MDkuODQ2WiIsImlhdCI6MTc4Mzg4Nzg0OSwiZXhwIjoxNzgzOTc0MjQ5fQ.igypQmMw9iVMArisdxTI-odCrGuVRZXL892g12-JTVc",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"food\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "AUTH",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "Login",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/auth/login",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"username\" : \"sameer\",\n  \"password\": \"password\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Register",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/auth/register",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{ \"name\": \"Sameer Katija\", \n  \"username\" : \"sameer\", \n  \"email\" : \"sameerkatija@gmail.com\", \n  \"password\" : \"password\", \n  \"confirmPassword\": \"password\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "Logout",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/auth/logout",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU2FtZWVyIEthdGlqYSIsInVzZXJuYW1lIjoic2FtZWVyIiwiZW1haWwiOiJzYW1lZXJrYXRpamFAZ21haWwuY29tIiwiY3JlYXRlZCI6IjIwMjYtMDctMTJUMTI6MTM6NTkuMjMxWiIsImlhdCI6MTc4Mzg1ODg2MSwiZXhwIjoxNzgzOTQ1MjYxfQ.I7ui9OXAhn8tRbwMn5Eqh-X4iGcFuIv8z3wlLgB1SJs",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "EXPENSE-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL EXPENSE",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET EXPENSE BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense/2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE EXPENSE",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/expense",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"categoryId\": 1,\n  \"amount\": 200,\n  \"expenseDate\": \"2026-07-14T10:30:00.000Z\",\n  \"description\": \"Pay to mazdoor\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE EXPENSE",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/expense/2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"categoryId\": 5,\n  \"amount\": 200,\n  \"description\": \"Ate Burger\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE EXPENSE ",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/expense/4",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL EXPENSE - Category",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense?categoryId=5",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL EXPENSE - to and from",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/expense?from=2026-07-01&to=2026-07-15&categoryId=5",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "PRODUCT-CATEGORY-ROUTES ",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GetALLProductCategories",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product-category",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GetBYIDProductCategories ",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product-category/2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CreateProductCategories",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/product-category/",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Diapers\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UpdateProductCategories",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/product-category/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"diaper-premium\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DeleteProductCategories",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/product-category/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"food\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "PRODUCT-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PRODUCT BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE PRODUCT",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/product",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n    \"name\": \"Pampers Premium Big 4\",\n    \"barcode\": \"8964001234558\",\n    \"sku\": \"PAMP-PC-J03\",\n    \"categoryId\": 2,\n    \"costPrice\": 80,\n    \"sellingPrice\": 100,\n    \"lowStockLevel\": 10,\n    \"piecesPerCarton\": 24,\n    \"isActive\": true\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE PRODUCT",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/product/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n    \"name\": \"Pampers Premium Care Jumbo XL\",\n    \"barcode\": \"8964001234567\",\n    \"sku\": \"PAMP-PC-J01\",\n    \"categoryId\": 2,\n    \"costPrice\": 1900,\n    \"sellingPrice\": 2000,\n    \"lowStockLevel\": 15,\n    \"piecesPerCarton\": 24,\n    \"isActive\": true\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE PRODUCT",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/product/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "ACTIVATE PRODUCT",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/product/1/activate",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL LOW STOCK PRODUCT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product/low-stock",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PRODUCT BY BARCODE",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product/barcode/8964001234567",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PRODUCT BY SKU",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product/sku/PAMP-PC-J01",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQwMzIyNzMsImV4cCI6MTc4NDExODY3M30.QgHq35EFuu31OnbsyGykEWuWFfMa5KDTyninYt1SZ48",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT - WITH SEARCH BY NAME",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product?search=XTRA",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT - WITH CATEGORY",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product?categoryId=1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT - WITH SEARCH BY SKU",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product?search=J01",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT - WITH ACTIVE FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product?isActive=false",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PRODUCT - WITH COMBINED FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/product?page=2&limit=20&search=tissue&categoryId=1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "CUSTOMER-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET CUSTOMER BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE CUSTOMER",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/customer",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Ahmed Raza\",\n  \"phone\": \"03151234567\",\n  \"address\": \"Jinnah Road, Quetta\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE CUSTOMER",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/customer/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Ahmed Khan\",\n  \"phone\": \"03151234567\",\n  \"address\": \"Jinnah Road, Quetta\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE CUSTOMER",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/customer/3",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "ACTIVATE CUSTOMER",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/customer/1/activate",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER ON PAGE 2",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer?page=2&limit=10",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER - WITH SEARCH BY NAME",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer?search=khan",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER- WITH PHONE",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer?search=0331",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER - WITH ACTIVE FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer?isActive=true",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER - WITH COMBINED FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/customer?search=khan&isActive=true&page=1&limit=2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "SUPPLIER-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "bearer",
+            "authActive": true,
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxOTM1NTYsImV4cCI6MTc4NDc5ODM1Nn0.d9JseEYW3hDxZITrS3tlyPkV2JwuIis4F1LjltL8_xU"
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SUPPLIER BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE SUPPLIER",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/supplier",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"RAZA Supplier Demo\",\n  \"phone\": \"03151234567\",\n  \"address\": \"Jinnah Road, Quetta\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE SUPPLIER",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/supplier/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Ahmed Supplier\",\n  \"phone\": \"03001234567\",\n  \"address\": \"\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE SUPPLIER",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/supplier/3",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "ACTIVATE SUPPLIER",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/supplier/1/activate",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER ON PAGE 2",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?page=2&limit=10",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER - WITH SEARCH BY NAME",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?search=demo",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER - WITH PHONE",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?search=0300",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER - WITH ACTIVE FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?isActive=true",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER- WITH COMBINED FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?search=supp&isActive=true&page=1&limit=2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "SALESMAN-ROUTE ",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "bearer",
+            "authActive": true,
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxOTM1NTYsImV4cCI6MTc4NDc5ODM1Nn0.d9JseEYW3hDxZITrS3tlyPkV2JwuIis4F1LjltL8_xU"
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SALESMAN BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE SALESMAN",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/salesman",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Akram\",\n  \"phone\": \"03001234567\",\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE SALESMAN",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/salesman/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"name\": \"Amjad Khan\",\n  \"phone\": \"03151234567\",\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE SALESMAN",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/salesman/1",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "ACTIVATE SALESMAN",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/salesman/1/activate",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN ON PAGE 2",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman?page=2&limit=10",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN- WITH SEARCH BY NAME",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman?search=amjad",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN- WITH PHONE",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/supplier?search=0300",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN- WITH ACTIVE FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman?isActive=true",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALESMAN- WITH COMBINED FILTER",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/salesman?search=A&isActive=true&page=1&limit=2",
+          "params": [],
+          "headers": [
+            {
+              "key": "Authorization",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxMTA4MzksImV4cCI6MTc4NDE5NzIzOX0.wXCdexcJFYdpdlsGutlbe031c1Sn5NLGSv6RwOyvizw",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "endpoint": "http://localhost:3000/api/salesman/1/target",
+          "name": "GET SALESMAN TARGET",
+          "params": [],
+          "headers": [],
+          "method": "GET",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "preRequestScript": "",
+          "testScript": "",
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "SALES TARGET - ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET ALL SALES TARGET",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-target",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "bearer",
+            "authActive": true,
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxOTM1NTYsImV4cCI6MTc4NDc5ODM1Nn0.d9JseEYW3hDxZITrS3tlyPkV2JwuIis4F1LjltL8_xU"
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SALES TARGET BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-target/1",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CREATE SALES TARGET",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/sales-target",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n    \"salesmanId\": 1,\n    \"month\": \"2026-06\",\n    \"targetAmount\": 10000,\n    \"description\": \"July FMCG sales target\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "UPDATE SALES TARGET",
+          "method": "PUT",
+          "endpoint": "http://localhost:3000/api/sales-target/1",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n    \"targetAmount\": 30000,\n    \"description\": \"July FMCG sales target\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "DELETE SALES TARGET",
+          "method": "DELETE",
+          "endpoint": "http://localhost:3000/api/sales-target/1",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALES TRGET - BY MONTH",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-target?month=2026-07-01",
+          "params": [],
+          "headers": [],
+          "preRequestScript": "",
+          "testScript": "",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "SET SALESMAN TARGET",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/sales-target/salesman/1/target",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"month\": \"2026-07\",\n  \"targetAmount\": 5000,\n  \"description\": \"FMCG target\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "LIST SALESMAN TARGETS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-target/salesman/1/target",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "CHECK SALESMAN ACHIEVEMENT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-target/salesman/1/achievement?month=2026-07",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "PURCHASE-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "CREATE PURCHASE",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/purchase/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"supplierId\": 1,\n  \"purchaseDate\": \"2026-07-16\",\n  \"discount\": 50,\n  \"paidAmount\": 500,\n  \"description\": \"Supplier buy-in\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 10,\n      \"unitCost\": 80\n    }\n  ]\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PURCHASES",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/purchase/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PURCHASE BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/purchase/1",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "PURCHASE-RETURN-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "CREATE PURCHASE RETURN",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/purchase-return/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"supplierId\": 1,\n  \"purchaseId\": 1,\n  \"returnDate\": \"2026-07-16\",\n  \"reason\": \"Defective stock\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2,\n      \"unitCost\": 80\n    }\n  ]\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL PURCHASE RETURNS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/purchase-return/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PURCHASE RETURN BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/purchase-return/1",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "INVOICE-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "CREATE INVOICE",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/invoice/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"customerId\": 1,\n  \"salesmanId\": 1,\n  \"saleType\": \"CREDIT\",\n  \"invoiceDate\": \"2026-07-16\",\n  \"discount\": 10,\n  \"paidAmount\": 100,\n  \"description\": \"Invoice sale\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 5,\n      \"unitPrice\": 120\n    }\n  ]\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL INVOICES",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/invoice/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET INVOICE BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/invoice/1",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "SALES-RETURN-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "CREATE SALES RETURN",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/sales-return/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"customerId\": 1,\n  \"invoiceId\": 1,\n  \"returnDate\": \"2026-07-16\",\n  \"reason\": \"Size exchange\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1,\n      \"unitPrice\": 120\n    }\n  ]\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SALES RETURNS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-return/",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SALES RETURN BY ID",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/sales-return/1",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "PAYMENT-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "RECORD CUSTOMER PAYMENT",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/payment/customer",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"customerId\": 1,\n  \"invoiceId\": 1,\n  \"amount\": 200,\n  \"paymentDate\": \"2026-07-16\",\n  \"description\": \"Invoice installment payment\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL CUSTOMER PAYMENTS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/payment/customer",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "RECORD SUPPLIER PAYMENT",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/payment/supplier",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"supplierId\": 1,\n  \"purchaseId\": 1,\n  \"amount\": 150,\n  \"paymentDate\": \"2026-07-16\",\n  \"description\": \"Supplier account payment\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET ALL SUPPLIER PAYMENTS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/payment/supplier",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "REPORT-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET DASHBOARD METRICS",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/dashboard",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SALES REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/sales",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SALES BY SALESMAN",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/sales-by-salesman",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PURCHASES REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/purchases",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET CURRENT STOCK REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/current-stock",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET LOW STOCK REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/low-stock",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET CUSTOMER LEDGER REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/customer-ledger",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET SUPPLIER LEDGER REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/supplier-ledger",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET PROFIT REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/profit",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET EXPENSE REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/expense",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "GET NET PROFIT REPORT",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/report/net-profit",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "name": "USER-ROUTE",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "name": "GET PROFILE (/me)",
+          "method": "GET",
+          "endpoint": "http://localhost:3000/api/user/me",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": null,
+            "body": null
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        },
+        {
+          "v": "17",
+          "name": "ADMIN RESET PASSWORD",
+          "method": "POST",
+          "endpoint": "http://localhost:3000/api/user/1/reset-password",
+          "params": [],
+          "headers": [],
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "contentType": "application/json",
+            "body": "{\n  \"newPassword\": \"newpassword123\"\n}"
+          },
+          "requestVariables": [],
+          "responses": {},
+          "description": null
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    }
+  ],
+  "requests": [
+    {
+      "v": "17",
+      "name": "Health-check",
+      "method": "GET",
+      "endpoint": "http://localhost:3000/api/",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": null,
+        "body": null
+      },
+      "requestVariables": [],
+      "responses": {},
+      "description": null
+    },
+    {
+      "v": "17",
+      "name": "Health-check - Auth",
+      "method": "GET",
+      "endpoint": "http://localhost:3000/api/req-auth",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true,
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxOTM1NTYsImV4cCI6MTc4NDc5ODM1Nn0.d9JseEYW3hDxZITrS3tlyPkV2JwuIis4F1LjltL8_xU",
+        "secret": "",
+        "algorithm": "HS256",
+        "payload": "",
+        "addTo": "HEADERS",
+        "isSecretBase64Encoded": false,
+        "headerPrefix": "",
+        "paramName": "token",
+        "jwtHeaders": ""
+      },
+      "body": {
+        "contentType": null,
+        "body": null
+      },
+      "requestVariables": [],
+      "responses": {},
+      "description": null
+    },
+    {
+      "v": "17",
+      "name": "/user/me",
+      "method": "GET",
+      "endpoint": "http://localhost:3000/api/user/me",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": null,
+        "body": null
+      },
+      "requestVariables": [],
+      "responses": {},
+      "description": null
+    }
+  ],
+  "auth": {
+    "authType": "bearer",
+    "authActive": true,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwibmFtZSI6IlNhbWVlciBLYXRpamEiLCJ1c2VybmFtZSI6InNhbWVlciIsImVtYWlsIjoic2FtZWVya2F0aWphQGdtYWlsLmNvbSIsImNyZWF0ZWQiOiIyMDI2LTA3LTEyVDIwOjI0OjA5Ljg0NloiLCJpYXQiOjE3ODQxOTQ3MjksImV4cCI6MTc4NDc5OTUyOX0.zW4sL3zWMNMEJWpQ_7KyjK3mUE9GWZMImm6dnFzq6-M"
+  },
+  "headers": [],
+  "variables": [],
+  "description": "",
+  "preRequestScript": "",
+  "testScript": ""
+}

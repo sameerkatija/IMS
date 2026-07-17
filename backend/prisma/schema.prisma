@@ -1,0 +1,658 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ================================================================
+// ENUMS
+// ================================================================
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+// Direction of a stock change. Quantity is always stored positive;
+// this enum tells you whether it added to, removed from, or
+// corrected the stock count.
+enum MovementType {
+  IN         // stock increased (purchase, sales return)
+  OUT        // stock decreased (sale, purchase return)
+}
+
+// What caused a StockMovement or ledger entry. Paired with
+// referenceId (the row's own id) so you can trace any movement
+// back to the exact Purchase/Invoice/Return/Adjustment that made it.
+enum ReferenceType {
+  PURCHASE
+  INVOICE
+  SALES_RETURN
+  PURCHASE_RETURN
+  ADJUSTMENT
+}
+
+// Whether a sale was paid in full at the counter (CASH) or is
+// owed by the customer (CREDIT). Only CREDIT sales ever touch
+// CustomerLedger.
+enum SaleType {
+  CASH
+  CREDIT
+}
+
+// Derived from paidAmount vs total on an Invoice — recalculated
+// every time a CustomerPayment is recorded against that invoice.
+enum InvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+
+// ================================================================
+// USERS
+// ================================================================
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  username     String    @unique
+  email        String?   @unique
+  password     String
+  role         Role      @default(STAFF)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdInvoices         Invoice[]
+  createdPurchases        Purchase[]
+  createdStockMovements   StockMovement[]
+  createdStockAdjustments StockAdjustment[]
+  createdSalesReturns     SalesReturn[]
+  createdPurchaseReturns  PurchaseReturn[]
+  createdCustomerPayments CustomerPayment[]
+  createdSupplierPayments SupplierPayment[]
+  createdExpenses         Expense[]
+  createdSalesTargets     SalesTarget[]
+}
+
+// ================================================================
+//  MASTER DATA
+// ================================================================
+// The reference data everything else hangs off: what you sell
+// (Category/Product), who you sell to (Customer), and who you
+// buy from (Supplier).
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products Product[]
+}
+
+model Product {
+  id           Int     @id @default(autoincrement())
+  name         String
+  barcode      String? @unique // optional; not every product is barcoded
+  sku          String  @unique // required internal code, always present
+  categoryId   Int
+  costPrice    Decimal @db.Decimal(12, 2) // what you pay per piece
+  sellingPrice Decimal @db.Decimal(12, 2) // what you charge per piece
+
+  // stockQuantity is a DENORMALIZED SNAPSHOT, always in pieces.
+  // It should always equal the sum of all StockMovement rows for
+  // this product. Only adjustStock() may write to this field —
+  // never set it directly in a controller or seed script outside
+  // of that one code path.
+  stockQuantity Int @default(0)
+
+  lowStockLevel Int @default(0) // below this (in pieces) = low stock
+
+  // Reference-only info for staff doing manual carton math at the
+  // counter. Not used in any calculation - purely a memory aid,
+  // e.g. "72" for a diaper carton means "1 carton = 72 pieces"
+  // when entering a sale/purchase. There is no unit-conversion
+  // system anywhere in this schema; every quantity field in every
+  // model below is always in pieces.
+  piecesPerCarton Int?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category            Category             @relation(fields: [categoryId], references: [id])
+  stockMovements      StockMovement[]      // full audit trail of every stock change
+  purchaseItems       PurchaseItem[]       // every time this was bought in
+  invoiceItems        InvoiceItem[]        // every time this was sold out
+  salesReturnItems    SalesReturnItem[]    // every time a customer returned this
+  purchaseReturnItems PurchaseReturnItem[] // every time you returned this to a supplier
+  stockAdjustments    StockAdjustment[]    // every manual correction made to this
+
+  @@index([categoryId])
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  balance   Decimal  @default(0) @db.Decimal(12, 2) // positive = customer owes us
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices      Invoice[]         // every sale to this customer (cash or credit)
+  payments      CustomerPayment[] // every payment received from this customer
+  ledgerEntries CustomerLedger[]  // full running-balance history
+  salesReturns  SalesReturn[]     // every return this customer made
+}
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  balance   Decimal  @default(0) @db.Decimal(12, 2) // positive = we owe them
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases       Purchase[]        // every stock buy-in from this supplier
+  payments        SupplierPayment[] // every payment we made to this supplier
+  ledgerEntries   SupplierLedger[]  // full running-balance history
+  purchaseReturns PurchaseReturn[]  // every return we made to this supplier
+}
+
+// ================================================================
+// SALESMEN & TARGETS
+// ================================================================
+// Answers "who sold what" and "are they hitting their number".
+// A Salesman is deliberately NOT a User — they don't log into the
+// software, they're just a name attributed on a sale so you can
+// report on individual performance (e.g. "Sales by Sameer").
+
+model Salesman {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices Invoice[]     // every sale attributed to this salesman
+  targets  SalesTarget[] // this salesman's target history, month by month
+}
+
+// One target row per salesman per calendar month. `month` is
+// always normalized to the first day of that month (e.g.
+// 2026-07-01), so the @@unique constraint below guarantees a
+// salesman can't accidentally get two targets for the same month.
+// Setting a NEW month's target never touches or overwrites past
+// months — that history stays intact for later reporting.
+//
+// "Achievement %" is not stored — it's calculated on read by
+// summing Invoice.total for that salesman within that month and
+// dividing by targetAmount. Storing a derived percentage would
+// let it drift out of sync with real sales; recompute it instead.
+model SalesTarget {
+  id           Int      @id @default(autoincrement())
+  salesmanId   Int
+  month        DateTime // always the 1st of the month, e.g. 2026-07-01
+  targetAmount Decimal  @db.Decimal(12, 2)
+  description  String?
+  createdById  Int      // which User set/last edited this target
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  salesman  Salesman @relation(fields: [salesmanId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@unique([salesmanId, month]) // one target per salesman per month, no dupes
+  @@index([salesmanId])
+  @@index([createdById])
+}
+
+
+
+
+// ================================================================
+// BUSINESS EXPENSES
+// ================================================================
+
+model ExpenseCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // e.g. "Van cost", "Utilities", "Wages"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses Expense[]
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int
+  amount      Decimal  @db.Decimal(12, 2)
+  expenseDate DateTime @default(now())
+  description String?  // e.g. "July diesel - delivery van"
+  createdById  Int      // which User set/last edited this target
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  createdBy User     @relation(fields: [createdById], references: [id])
+  @@index([categoryId])
+  @@index([expenseDate])
+}
+
+// ================================================================
+// INVENTORY CORE
+// ================================================================
+// This is the heart of the whole system. Every other section
+// below (Purchases, Sales, Returns) ultimately writes here.
+// StockMovement is the single, permanent audit trail of every
+// stock change that has ever happened, always in pieces, always
+// positive - type (IN/OUT) gives the direction, with zero
+// exceptions. Given a productId, summing quantity (IN adds, OUT
+// subtracts) should always reproduce Product.stockQuantity exactly.
+// If it doesn't, something wrote to stockQuantity outside of
+// adjustStock() and that's a bug to hunt down immediately.
+//
+// referenceType + referenceId let you trace any row here back to
+// exactly which Purchase/Invoice/SalesReturn/PurchaseReturn/
+// StockAdjustment caused it — e.g. referenceType=INVOICE,
+// referenceId=42 means "this movement happened because of
+// Invoice #42". A manual correction shows up here as an ordinary
+// IN or OUT movement with referenceType=ADJUSTMENT — the enum that
+// answers "what caused this" is entirely separate from the enum
+// that answers "which direction did it go".
+
+model StockMovement {
+  id            Int           @id @default(autoincrement())
+  productId     Int
+  type          MovementType // IN our OUT
+  quantity      Int           // ALWAYS positive, in pieces. `type` (IN/OUT) gives
+                               // direction — there is no exception for adjustments
+                               // anymore. If a correction removes stock, write it as
+                               // an OUT movement with a positive quantity, not a
+                               // negative IN.
+  referenceType ReferenceType
+  referenceId   Int           // id of the Purchase/Invoice/Return/Adjustment that caused this
+
+  // Which User's request triggered adjustStock() for this row. For
+  // most movements this will match the createdById on the parent
+  // record (e.g. the Invoice), since adjustStock() is called from
+  // inside that same request - but it's stored here too so the
+  // stock audit trail is self-contained and doesn't require a join
+  // through referenceType/referenceId just to answer "who touched
+  // this product's stock".
+  createdById   Int
+  description   String?
+  createdAt     DateTime      @default(now())
+
+  product   Product @relation(fields: [productId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([productId])
+  @@index([referenceType, referenceId])
+  @@index([createdById])
+}
+
+// A manual, standalone correction — damaged goods, expired stock,
+// or reconciling a physical count against what the system thinks
+// you have. `quantity` here keeps its natural signed value (+8 found
+// on recount, -3 damaged) because that's genuinely how a correction
+// is expressed and reported on. adjustStock() is responsible for
+// translating that sign into the right StockMovement row: positive
+// quantity -> type=IN, negative quantity -> type=OUT (using the
+// absolute value), always with referenceType=ADJUSTMENT and
+// referenceId = this row's id. Every StockAdjustment must produce
+// exactly one matching StockMovement row, created in the same
+// transaction, via adjustStock() — never insert a StockAdjustment
+// without going through that function.
+
+model StockAdjustment {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  quantity    Int      // in pieces; positive = stock increased, negative = decreased
+  reason      String   // e.g. "Damaged", "Expired", "Recount"
+  notes       String?
+  createdById Int      // which User made this manual correction
+  createdAt   DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([createdById])
+}
+
+// ================================================================
+// PURCHASES
+// ================================================================
+// Flow: Supplier -> Purchase (+ PurchaseItems) -> StockMovement
+// (IN, one per item) -> SupplierLedger credit -> Supplier.balance
+// update. All of this happens inside ONE database transaction —
+// either the whole purchase is recorded or none of it is.
+
+
+model Purchase {
+  id            Int           @id @default(autoincrement())
+  purchaseNo    String        @unique // human-facing reference number, e.g. "PUR-0001"
+  supplierId    Int
+  purchaseDate  DateTime      @default(now())
+  subtotal      Decimal       @db.Decimal(12, 2) // sum of item totalCosts, before discount
+  discount      Decimal?      @default(0) @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2) // subtotal - discount; what actually hits SupplierLedger
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  creditApplied Decimal       @default(0) @db.Decimal(12, 2)
+  balanceDue    Decimal       @default(0) @db.Decimal(12, 2)
+  status        InvoiceStatus @default(UNPAID)
+  description   String?
+  createdById   Int      // which User entered this purchase
+  createdAt     DateTime      @default(now())
+
+  supplier  Supplier          @relation(fields: [supplierId], references: [id])
+  createdBy User              @relation(fields: [createdById], references: [id])
+  items     PurchaseItem[]
+  returns   PurchaseReturn[]  // returns made against this specific purchase - see PurchaseReturn.purchaseId
+  payments  SupplierPayment[] // payments recorded specifically against this purchase - see SupplierPayment.purchaseId
+
+  @@index([supplierId])
+  @@index([purchaseDate])
+  @@index([createdById])
+}
+
+model PurchaseItem {
+  id         Int     @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  quantity   Int     // in pieces - if a carton was received, staff enters the piece total
+  unitCost   Decimal @db.Decimal(12, 2) // cost per piece, at time of purchase
+  totalCost  Decimal @db.Decimal(12, 2) // quantity * unitCost
+
+  // onDelete: Cascade — deleting a Purchase deletes its line items
+  // with it. There is no equivalent cascade back into StockMovement
+  // or SupplierLedger; a Purchase should never actually be deleted
+  // once posted — use a PurchaseReturn to reverse it instead.
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// Reverses a purchase, partially or fully: stock goes back OUT,
+// and what you owed the supplier for those items goes down.
+model PurchaseReturn {
+  id          Int      @id @default(autoincrement())
+  returnNo    String?   @unique
+  supplierId  Int
+
+  // Which purchase this return is reversing. Nullable for the same reason
+  // as SalesReturn.invoiceId - not every return is guaranteed to be tied
+  // to one specific purchase (e.g. a supplier dispute over stock received
+  // across several deliveries), but whenever it IS set, it gives you real
+  // traceability: "prove exactly which order this shortfall/damage came
+  // from" for supplier disputes, instead of just a floating totalAmount.
+  purchaseId  Int
+
+  returnDate  DateTime @default(now())
+  totalAmount Decimal  @db.Decimal(12, 2)
+  reason      String?
+  createdById Int      // which User recorded this return
+  createdAt   DateTime @default(now())
+
+  supplier  Supplier             @relation(fields: [supplierId], references: [id])
+  purchase  Purchase?            @relation(fields: [purchaseId], references: [id])
+  createdBy User                 @relation(fields: [createdById], references: [id])
+  items     PurchaseReturnItem[]
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([createdById])
+}
+
+model PurchaseReturnItem {
+  id               Int     @id @default(autoincrement())
+  purchaseReturnId Int
+  productId        Int
+  quantity         Int     // in pieces
+  unitCost         Decimal @db.Decimal(12, 2)
+  totalCost        Decimal @db.Decimal(12, 2)
+
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  product        Product        @relation(fields: [productId], references: [id])
+
+  @@index([purchaseReturnId])
+  @@index([productId])
+}
+
+// ================================================================
+// SALES / INVOICES
+// ================================================================
+// Flow (CASH): Customer(null) -> Invoice -> InvoiceItems ->
+// StockMovement (OUT). No ledger entry — money changed hands in
+// full at the counter.
+//
+// Flow (CREDIT): Customer -> Invoice -> InvoiceItems ->
+// StockMovement (OUT) -> CustomerLedger debit -> Customer.balance
+// update. The customer now owes you the balanceDue.
+
+model Invoice {
+  id          Int           @id @default(autoincrement())
+  invoiceNo   String        @unique
+  customerId  Int?          // null = walk-in cash sale, no customer record needed
+  salesmanId  Int?          // null = no salesman attributed (e.g. counter sale)
+  saleType    SaleType      @default(CASH) // Cash or CREDIT
+  invoiceDate DateTime      @default(now())
+  subtotal    Decimal       @db.Decimal(12, 2)
+  discount    Decimal?       @default(0) @db.Decimal(12, 2)
+  total       Decimal       @db.Decimal(12, 2) // subtotal - discount; this is what counts toward salesman targets
+  paidAmount  Decimal       @default(0) @db.Decimal(12, 2)
+  creditApplied Decimal     @default(0) @db.Decimal(12, 2)
+  balanceDue  Decimal       @default(0) @db.Decimal(12, 2) // total - paidAmount - creditApplied
+  status      InvoiceStatus @default(UNPAID) // derived from (paidAmount + creditApplied) vs total
+  description String?
+
+  // The logged-in User who entered this invoice - NOT the Salesman.
+  // salesmanId says who gets sales credit for the deal; createdById
+  // says whose account actually keyed it into the system. This is
+  // the field that answers "did Sooraj or Sameer create this
+  // invoice" if one ever looks bogus. Always set from the
+  // authenticated session server-side, never trust a client-supplied
+  // value for this field.
+  createdById Int
+  createdAt   DateTime      @default(now())
+
+  customer         Customer?         @relation(fields: [customerId], references: [id])
+  salesman         Salesman?         @relation(fields: [salesmanId], references: [id])
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  items            InvoiceItem[]
+  customerPayments CustomerPayment[] // payments recorded specifically against this invoice
+  salesReturns     SalesReturn[]     // returns made against this specific invoice - see SalesReturn.invoiceId
+
+  @@index([customerId])
+  @@index([salesmanId])
+  @@index([invoiceDate])
+  @@index([status])
+  @@index([createdById])
+}
+
+model InvoiceItem {
+  id        Int    @id @default(autoincrement())
+  invoiceId Int
+  productId Int
+  quantity  Int    // in pieces - if a carton was sold, staff enters the piece total
+  unitPrice Decimal @db.Decimal(12, 2) // selling price per piece, at time of sale
+
+  // Snapshot of product.costPrice at the moment of sale. This is
+  // what makes the Profit Report historically accurate — if you
+  // raise or lower a product's cost price next month, old invoices
+  // still calculate profit using what the product actually cost
+  // YOU back when it sold, not today's cost.
+  costPriceAtSale Decimal @db.Decimal(12, 2)
+
+  totalPrice Decimal @db.Decimal(12, 2) // quantity * unitPrice
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
+}
+
+// Reverses a sale, partially or fully: stock comes back IN, and
+// if the original sale was on credit, a CustomerLedger credit
+// reduces what that customer owes.
+
+model SalesReturn {
+  id          Int      @id @default(autoincrement())
+  returnNo    String?   @unique
+  customerId  Int?
+
+  // Which sale this return is reversing. Nullable so a goodwill/no-receipt
+  // return is still possible, but whenever it's set, it's what lets a
+  // return correctly net out of the ORIGINAL salesman's figures (via
+  // invoice.salesmanId) instead of just vanishing from stock/ledger
+  // while still counting toward that salesman's month. Reporting code
+  // should only net a return against salesman performance when
+  // invoiceId is present - a return with no invoiceId affects stock
+  // and (if there's a customer) the ledger, but no salesman's number.
+  invoiceId   Int
+
+  returnDate  DateTime @default(now())
+  totalAmount Decimal  @db.Decimal(12, 2)
+  refundType  String   @default("CREDIT") // CREDIT (store credit) or CASH (refund paid)
+  reason      String?
+  createdById Int      // which User recorded this return
+  createdAt   DateTime @default(now())
+
+  customer  Customer?         @relation(fields: [customerId], references: [id])
+  invoice   Invoice?          @relation(fields: [invoiceId], references: [id])
+  createdBy User              @relation(fields: [createdById], references: [id])
+  items     SalesReturnItem[]
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([createdById])
+}
+
+model SalesReturnItem {
+  id            Int     @id @default(autoincrement())
+  salesReturnId Int
+  productId     Int
+  quantity      Int     // in pieces
+  unitPrice     Decimal @db.Decimal(12, 2)
+  totalPrice    Decimal @db.Decimal(12, 2)
+
+  salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id])
+
+  @@index([salesReturnId])
+  @@index([productId])
+}
+
+// ================================================================
+// PAYMENTS & LEDGERS
+// ================================================================
+
+// Every rupee moving in or out, plus a permanent running-balance
+// history. Customer.balance / Supplier.balance are denormalized
+// snapshots that must ALWAYS equal the `balance` field of that
+// entity's most recent ledger row — if they ever disagree, that's
+// a sign a write happened outside the proper transaction.
+
+model CustomerPayment {
+  id          Int      @id @default(autoincrement())
+  customerId  Int
+  invoiceId   Int?     // null = general payment against overall balance, not one invoice
+  amount      Decimal  @db.Decimal(12, 2)
+  paymentDate DateTime @default(now())
+  description String?
+  createdById Int      // which User recorded this payment as received
+  createdAt   DateTime @default(now())
+
+  customer  Customer @relation(fields: [customerId], references: [id])
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([createdById])
+}
+
+model SupplierPayment {
+  id          Int      @id @default(autoincrement())
+  supplierId  Int
+  purchaseId  Int?     // null = general payment against overall balance
+  amount      Decimal  @db.Decimal(12, 2)
+  paymentDate DateTime @default(now())
+  description String?
+  createdById Int      // which User recorded this payment as sent
+  createdAt   DateTime @default(now())
+
+  supplier  Supplier  @relation(fields: [supplierId], references: [id])
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([createdById])
+}
+
+// Full running-balance history for a customer — think of this as
+// a bank statement. Every credit sale, payment, and sales return
+// adds one row here. `balance` is the running total AFTER this
+// entry, so the most recent row's balance must always match
+// Customer.balance exactly.
+
+model CustomerLedger {
+  id            Int           @id @default(autoincrement())
+  customerId    Int
+  debit         Decimal       @default(0) @db.Decimal(12, 2) // increases balance owed to us (credit sale)
+  credit        Decimal       @default(0) @db.Decimal(12, 2) // decreases balance owed to us (payment, return)
+  balance       Decimal       @db.Decimal(12, 2)              // running balance after this entry
+  referenceType ReferenceType 
+  referenceId   Int
+  description   String?
+  createdAt     DateTime      @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([referenceType, referenceId])
+}
+
+// Same idea as CustomerLedger, but for what YOU owe suppliers.
+// Note debit/credit are inverted in meaning versus CustomerLedger:
+// here a purchase (credit) increases what we owe, and a payment
+// (debit) decreases it.
+model SupplierLedger {
+  id            Int           @id @default(autoincrement())
+  supplierId    Int
+  debit         Decimal       @default(0) @db.Decimal(12, 2) // decreases what we owe them (payment)
+  credit        Decimal       @default(0) @db.Decimal(12, 2) // increases what we owe them (purchase)
+  balance       Decimal       @db.Decimal(12, 2)              // running balance after this entry
+  referenceType ReferenceType
+  referenceId   Int
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@index([referenceType, referenceId])
+}

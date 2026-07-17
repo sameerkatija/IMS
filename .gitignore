@@ -1,0 +1,31 @@
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules/
+backend/node_modules/
+client/node_modules/
+
+# Build output
+client/dist/
+backend/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma
+prisma/migrations/**/migration_lock.toml.bak
+
+# Backups
+database/*.sql
+database/*.dump
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
