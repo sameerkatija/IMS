@@ -16,6 +16,7 @@ const Products = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
+  const [totalProducts, setTotalProducts] = useState(0);
   
   // Form modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,6 +46,7 @@ const Products = () => {
       if (response.data && response.data.type === "success") {
         setProducts(response.data.data);
         setTotalPages(response.data.pagination.totalPages);
+        setTotalProducts(response.data.pagination.total);
       }
     } catch (err) {
       console.error(err);
@@ -194,8 +196,13 @@ const Products = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-200 dark:border-slate-800 pb-5 gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Products List</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            Products List
+            <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-full font-semibold border border-slate-200/50 dark:border-slate-800/50">
+              {totalProducts} Total
+            </span>
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Create, search, and monitor items. Low stock alerts are highlighted in yellow.
           </p>
         </div>

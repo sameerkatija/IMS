@@ -3,6 +3,7 @@ import api from "../services/api";
 import { RotateCcw, Plus, Calendar, ArrowRight, Clipboard, Trash2, ArrowLeftRight, Check, ShieldAlert, Eye, Printer } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
+import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
 
 const Returns = () => {
   const { user } = useAuth();
@@ -763,7 +764,7 @@ const Returns = () => {
                       <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-center items-end text-right">
                         <p className="text-xs text-slate-400 uppercase font-semibold">Total Credit Return</p>
                         <p className="text-lg font-black text-rose-600 dark:text-rose-455">
-                          Rs. {salesReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0).toFixed(2)}
+                          Rs. {formatCurrency(salesReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0))}
                         </p>
                       </div>
                     </div>
@@ -830,7 +831,7 @@ const Returns = () => {
                         </td>
                         <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{ret.reason || <span className="italic text-slate-400">No notes</span>}</td>
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-400">
-                          Rs. {Number(ret.totalAmount).toFixed(2)}
+                          Rs. {formatCurrency(ret.totalAmount)}
                         </td>
                         <td className="px-6 py-4 text-center no-print">
                           <button
@@ -957,7 +958,7 @@ const Returns = () => {
                       <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-center items-end text-right">
                         <p className="text-xs text-slate-400 uppercase font-semibold">Total Debit Return</p>
                         <p className="text-lg font-black text-rose-600 dark:text-rose-455">
-                          Rs. {purchaseReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitCost), 0).toFixed(2)}
+                          Rs. {formatCurrency(purchaseReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitCost), 0))}
                         </p>
                       </div>
                     </div>
@@ -1017,7 +1018,7 @@ const Returns = () => {
                         <td className="px-6 py-4 font-semibold capitalize">{ret.supplier?.name}</td>
                         <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{ret.reason || <span className="italic text-slate-400">No notes</span>}</td>
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-455">
-                          Rs. {Number(ret.totalAmount).toFixed(2)}
+                          Rs. {formatCurrency(ret.totalAmount)}
                         </td>
                         <td className="px-6 py-4 text-center no-print">
                           <button
@@ -1145,10 +1146,10 @@ const Returns = () => {
                         </td>
                         <td className="px-4 py-2.5 text-right font-semibold">{item.quantity} pcs</td>
                         <td className="px-4 py-2.5 text-right">
-                          Rs. {Number(detailType === "sales" ? item.unitPrice : item.unitCost).toFixed(2)}
+                          Rs. {formatCurrency(detailType === "sales" ? item.unitPrice : item.unitCost)}
                         </td>
                         <td className="px-4 py-2.5 text-right font-bold">
-                          Rs. {Number(detailType === "sales" ? item.totalPrice : item.totalCost).toFixed(2)}
+                          Rs. {formatCurrency(detailType === "sales" ? item.totalPrice : item.totalCost)}
                         </td>
                       </tr>
                     ))}
@@ -1166,7 +1167,7 @@ const Returns = () => {
                   <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-950 dark:text-white">
                     <span>Total Refund Value:</span>
                     <span className="text-rose-600 dark:text-rose-400 text-sm">
-                      Rs. {Number(selectedReturnDetail.totalAmount).toFixed(2)}
+                      Rs. {formatCurrency(selectedReturnDetail.totalAmount)}
                     </span>
                   </div>
                 </div>

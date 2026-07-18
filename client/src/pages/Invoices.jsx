@@ -3,6 +3,7 @@ import api from "../services/api";
 import { Receipt, Plus, Search, Eye, Printer, Trash2, Calendar, User, UserCheck } from "lucide-react";
 import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
 
 const Invoices = () => {
   const { user } = useAuth();
@@ -39,7 +40,7 @@ const Invoices = () => {
   const [paidAmount, setPaidAmount] = useState("0");
   const [creditApplied, setCreditApplied] = useState("0");
   const [description, setDescription] = useState("");
-  const [items, setItems] = useState([{ productId: "", quantity: "", unitPrice: "" }]);
+  const [items, setItems] = useState([{ productId: "", quantity: "", unitPrice: "", discount: "0" }]);
   const [submitting, setSubmitting] = useState(false);
 
   // Print & Details State
@@ -91,7 +92,7 @@ const Invoices = () => {
   }, []);
 
   const addItemRow = () => {
-    setItems([...items, { productId: "", quantity: "", unitPrice: "" }]);
+    setItems([...items, { productId: "", quantity: "", unitPrice: "", discount: "0" }]);
   };
 
   const removeItemRow = (index) => {
@@ -131,7 +132,8 @@ const Invoices = () => {
   const subtotal = items.reduce((acc, curr) => {
     const qty = Number(curr.quantity) || 0;
     const price = Number(curr.unitPrice) || 0;
-    return acc + (qty * price);
+    const disc = Number(curr.discount) || 0;
+    return acc + Math.max(0, (qty * price) - disc);
   }, 0);
 
   const calculatedDiscountAmount = discountType === "%"
@@ -178,7 +180,7 @@ const Invoices = () => {
 
     if (total < totalCost) {
       setToast({
-        message: `Invoice discount is too high. Net total (Rs. ${total.toFixed(2)}) cannot go below the total cost price of the items (Rs. ${totalCost.toFixed(2)}).`,
+        message: `Invoice discount is too high. Net total (Rs. ${formatCurrency(total)}) cannot go below the total cost price of the items (Rs. ${formatCurrency(totalCost)}).`,
         type: "error"
       });
       return;
@@ -202,7 +204,8 @@ const Invoices = () => {
         items: validItems.map(it => ({
           productId: Number(it.productId),
           quantity: Number(it.quantity),
-          unitPrice: Number(it.unitPrice)
+          unitPrice: Number(it.unitPrice),
+          discount: Number(it.discount) || 0
         }))
       };
 
@@ -324,7 +327,7 @@ const Invoices = () => {
                 >
                   <option value="">{saleType === "CASH" ? "Walk-in Counter Customer" : "Select Credit Account..."}</option>
                   {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} (Bal: Rs.{Number(c.balance).toFixed(0)})</option>
+                    <option key={c.id} value={c.id}>{c.name} (Bal: Rs. {formatCurrencyNoDecimals(c.balance)})</option>
                   ))}
                 </select>
               </div>
@@ -385,7 +388,7 @@ const Invoices = () => {
                           <option value="">Select Item...</option>
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name}{p.size ? ` (${p.size})` : ""} (Stock: {p.stockQuantity} pcs) [Rs. {Number(p.sellingPrice).toFixed(0)}]
+                              {p.name}{p.size ? ` (${p.size})` : ""} (Stock: {p.stockQuantity} pcs) [Rs. {formatCurrencyNoDecimals(p.sellingPrice)}]
                             </option>
                           ))}
                         </select>
@@ -417,10 +420,22 @@ const Invoices = () => {
                         />
                       </div>
 
+                      <div className="w-full md:w-32">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Discount (PKR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0.00"
+                          value={item.discount}
+                          onChange={(e) => handleItemChange(index, "discount", e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                        />
+                      </div>
+
                       <div className="w-full md:w-36">
                         <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Subtotal</label>
                         <div className="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-850 rounded-lg text-sm text-slate-500 text-right font-semibold select-none">
-                          Rs. {((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toFixed(2)}
+                          Rs. {formatCurrency(Math.max(0, (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0)))}
                         </div>
                       </div>
 
@@ -489,7 +504,7 @@ const Invoices = () => {
                       return (
                         <div>
                           <label className="text-xs font-semibold text-amber-600 dark:text-amber-500 uppercase block mb-1">
-                            Apply Store Credit (Max Rs. {availableCredit.toFixed(0)})
+                            Apply Store Credit (Max Rs. {formatCurrencyNoDecimals(availableCredit)})
                           </label>
                           <input
                             type="number"
@@ -519,33 +534,28 @@ const Invoices = () => {
               <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-right w-full md:w-80 space-y-1.5">
                 <div className="flex justify-between text-xs text-slate-400">
                   <span>Gross Invoice Total:</span>
-                  <span className="font-semibold">Rs. {subtotal.toFixed(2)}</span>
+                  <span className="font-semibold">Rs. {formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-rose-500">
-                  <span>Discounts Applied:</span>
-                  <span className="font-semibold">
+                  <span>Invoice Discount:</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
                     {discountType === "%"
-                      ? `- ${Number(discount || 0)}% (Rs. ${calculatedDiscountAmount.toFixed(2)})`
-                      : `- Rs. ${Number(discount || 0).toFixed(2)}`
-                    }
+                      ? `- ${Number(discount || 0)}% (Rs. ${formatCurrency(calculatedDiscountAmount)})`
+                      : `- Rs. ${formatCurrency(Number(discount || 0))}`}
                   </span>
                 </div>
-                {Number(creditApplied) > 0 && (
-                  <div className="flex justify-between text-xs text-amber-500">
-                    <span>Store Credit Used:</span>
-                    <span className="font-semibold">- Rs. {Number(creditApplied).toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-950 dark:text-white">
-                  <span>Grand Net Value:</span>
-                  <span className="text-sky-600 dark:text-sky-400">Rs. {total.toFixed(2)}</span>
+                <div className="flex justify-between text-xs text-blue-500">
+                  <span>Store Credit Applied:</span>
+                  <span className="font-semibold">- Rs. {formatCurrency(Number(creditApplied))}</span>
                 </div>
-                {saleType === "CREDIT" && (
-                  <div className="flex justify-between text-xs text-amber-500 font-semibold mt-1">
-                    <span>Credit Charge:</span>
-                    <span>Rs. {Math.max(0, total - (Number(paidAmount) || 0) - (Number(creditApplied) || 0)).toFixed(2)}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5 font-bold">
+                  <span>Total Amount:</span>
+                  <span className="text-sky-600 dark:text-sky-400">Rs. {formatCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Balance Due:</span>
+                  <span>Rs. {formatCurrency(Math.max(0, total - (Number(paidAmount) || 0) - (Number(creditApplied) || 0)))}</span>
+                </div>
               </div>
             </div>
 
@@ -663,18 +673,18 @@ const Invoices = () => {
                             {inv.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} pcs
                           </td>
                           <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">
-                            Rs. {Number(inv.total).toFixed(2)}
+                            Rs. {formatCurrency(inv.total)}
                           </td>
                           {user?.role === "ADMIN" && (
-                            <td className="px-6 py-4 text-right font-bold text-emerald-600 dark:text-emerald-450">
-                              Rs. {calculateInvoiceProfit(inv).toFixed(2)}
+                            <td className="px-6 py-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                              Rs. {formatCurrency(calculateInvoiceProfit(inv))}
                             </td>
                           )}
-                          <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-400 font-semibold">
-                            Rs. {Number(inv.paidAmount).toFixed(2)}
+                          <td className="px-6 py-4 text-xs font-semibold text-slate-900 dark:text-white">
+                            Rs. {formatCurrency(inv.paidAmount)}
                           </td>
-                          <td className="px-6 py-4 text-right text-rose-600 dark:text-rose-455 font-semibold">
-                            Rs. {Number(inv.balanceDue).toFixed(2)}
+                          <td className="px-6 py-4 text-xs font-semibold text-rose-600 dark:text-rose-400 font-bold">
+                            Rs. {formatCurrency(inv.balanceDue)}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full border ${inv.status === "PAID"
@@ -797,44 +807,43 @@ const Invoices = () => {
                       <tr key={item.id}>
                         <td className="py-1 capitalize">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
                         <td className="py-1 text-right">{item.quantity}</td>
-                        <td className="py-1 text-right">{Number(item.unitPrice).toFixed(0)}</td>
-                        <td className="py-1 text-right font-bold">{Number(item.totalPrice).toFixed(0)}</td>
+                        <td className="py-1 text-right">{formatCurrencyNoDecimals(item.unitPrice)}</td>
+                        <td className="py-1 text-right font-bold">{formatCurrencyNoDecimals(item.totalPrice)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                <hr className="border-dashed border-slate-300 dark:border-slate-700 print:border-black" />
-
-                <div className="text-[10px] text-right space-y-1">
+                {/* POS Receipt Totals */}
+                <div className="border-t border-dashed border-slate-300 dark:border-slate-700 print:border-black pt-1 space-y-0.5 text-[9px]">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>Rs. {Number(selectedInvoice.subtotal).toFixed(0)}</span>
+                    <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.subtotal)}</span>
                   </div>
                   {Number(selectedInvoice.discount) > 0 && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-rose-500">
                       <span>Discount:</span>
-                      <span>-Rs. {Number(selectedInvoice.discount).toFixed(0)}</span>
+                      <span>-Rs. {formatCurrencyNoDecimals(selectedInvoice.discount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-bold text-xs">
-                    <span>Total Net:</span>
-                    <span>Rs. {Number(selectedInvoice.total).toFixed(0)}</span>
+                  <div className="flex justify-between font-bold border-t border-dashed border-slate-200 dark:border-slate-800 print:border-slate-300 pt-0.5">
+                    <span>Grand Total:</span>
+                    <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.total)}</span>
                   </div>
                   {Number(selectedInvoice.creditApplied) > 0 && (
-                    <div className="flex justify-between text-[9px] text-amber-600 font-semibold">
-                      <span>Credit Used:</span>
-                      <span>Rs. {Number(selectedInvoice.creditApplied).toFixed(0)}</span>
+                    <div className="flex justify-between">
+                      <span>Store Credit:</span>
+                      <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.creditApplied)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-[9px]">
-                    <span>Paid Cash:</span>
-                    <span>Rs. {Number(selectedInvoice.paidAmount).toFixed(0)}</span>
+                  <div className="flex justify-between">
+                    <span>Paid (Cash):</span>
+                    <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.paidAmount)}</span>
                   </div>
                   {Number(selectedInvoice.balanceDue) > 0 && (
-                    <div className="flex justify-between text-[9px] font-bold">
+                    <div className="flex justify-between text-rose-500 font-bold">
                       <span>Balance Due:</span>
-                      <span>Rs. {Number(selectedInvoice.balanceDue).toFixed(0)}</span>
+                      <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.balanceDue)}</span>
                     </div>
                   )}
                 </div>
@@ -885,11 +894,9 @@ const Invoices = () => {
                   <tbody>
                     {selectedInvoice.items?.map((item, idx) => {
                       const tpRate = Number(item.unitPrice);
-                      // Compute per-item discount from invoice-level discount proportionally
                       const itemSubtotal = Number(item.totalPrice);
                       const invoiceSubtotal = Number(selectedInvoice.subtotal) || 1;
                       const invoiceDiscount = Number(selectedInvoice.discount) || 0;
-                      // Item-level discount amount (proportional share of invoice discount)
                       const discAmt = invoiceSubtotal > 0 ? (itemSubtotal / invoiceSubtotal) * invoiceDiscount : 0;
                       const discPct = tpRate > 0 ? ((discAmt / item.quantity) / tpRate) * 100 : 0;
                       const netRate = tpRate - (discAmt / (item.quantity || 1));
@@ -898,12 +905,12 @@ const Invoices = () => {
                         <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
                           <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
                           <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{tpRate.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(tpRate)}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{invoiceDiscount > 0 ? `${discPct.toFixed(0)}%` : '0%'}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{discAmt.toFixed(2)}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{netRate.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(discAmt)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(netRate)}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{lineTotal.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(lineTotal)}</td>
                         </tr>
                       );
                     })}
@@ -914,35 +921,33 @@ const Invoices = () => {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <div style={{ minWidth: '300px', fontSize: '12px' }}>
                     <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                      <span>Sub Total (After Item Discounts):</span>
-                      <span style={{ fontWeight: '700' }}>PKR {(Number(selectedInvoice.subtotal) - Number(selectedInvoice.discount || 0)).toFixed(2)}</span>
+                      <span>Items Subtotal (Net of Item Discs):</span>
+                      <span style={{ fontWeight: '700' }}>PKR {formatCurrency(Number(selectedInvoice.subtotal) - Number(selectedInvoice.discount || 0))}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                      <span>Invoice Discount {Number(selectedInvoice.discount) > 0 ? '' : '0%'} (PKR {Number(selectedInvoice.discount || 0).toFixed(2)}):</span>
-                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedInvoice.discount || 0).toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                      <span>Builty Discount 0% (PKR 0.00):</span>
-                      <span style={{ fontWeight: '600' }}>PKR 0.00</span>
-                    </div>
+                    {Number(selectedInvoice.discount) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                        <span>Invoice Discount {Number(selectedInvoice.discount) > 0 ? '' : '0%'} (PKR {formatCurrency(Number(selectedInvoice.discount || 0))}):</span>
+                        <span style={{ fontWeight: '600' }}>PKR {formatCurrency(Number(selectedInvoice.discount || 0))}</span>
+                      </div>
+                    )}
                     <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px' }}>
-                      <span style={{ fontWeight: '800', fontSize: '13px' }}>NET PAYABLE:</span>
-                      <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {Number(selectedInvoice.total).toFixed(2)}</span>
+                      <span style={{ fontWeight: '800', fontSize: '13px' }}>NET TOTAL AMOUNT:</span>
+                      <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {formatCurrency(selectedInvoice.total)}</span>
                     </div>
                     {Number(selectedInvoice.creditApplied) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#b45309' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#3b82f6' }}>
                         <span>Store Credit Applied:</span>
-                        <span style={{ fontWeight: '600' }}>- PKR {Number(selectedInvoice.creditApplied).toFixed(2)}</span>
+                        <span style={{ fontWeight: '600' }}>- PKR {formatCurrency(selectedInvoice.creditApplied)}</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
-                      <span>Amount Received:</span>
-                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedInvoice.paidAmount).toFixed(2)}</span>
+                      <span>Amount Received (Cash):</span>
+                      <span style={{ fontWeight: '600' }}>PKR {formatCurrency(selectedInvoice.paidAmount)}</span>
                     </div>
                     {Number(selectedInvoice.balanceDue) > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
                         <span>Balance Due:</span>
-                        <span>PKR {Number(selectedInvoice.balanceDue).toFixed(2)}</span>
+                        <span>PKR {formatCurrency(selectedInvoice.balanceDue)}</span>
                       </div>
                     )}
                   </div>

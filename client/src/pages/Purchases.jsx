@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import { ShoppingCart, Plus, Search, FileText, Printer, Trash2, Eye, Calendar } from "lucide-react";
 import Toast from "../components/Toast";
+import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
@@ -23,7 +24,7 @@ const Purchases = () => {
   const [paidAmount, setPaidAmount] = useState("0");
   const [creditApplied, setCreditApplied] = useState("0");
   const [description, setDescription] = useState("");
-  const [items, setItems] = useState([{ productId: "", quantity: "", unitCost: "" }]);
+  const [items, setItems] = useState([{ productId: "", quantity: "", unitCost: "", discount: "0" }]);
   const [submitting, setSubmitting] = useState(false);
 
   // Detail view state
@@ -68,7 +69,7 @@ const Purchases = () => {
   }, []);
 
   const addItemRow = () => {
-    setItems([...items, { productId: "", quantity: "", unitCost: "" }]);
+    setItems([...items, { productId: "", quantity: "", unitCost: "", discount: "0" }]);
   };
 
   const removeItemRow = (index) => {
@@ -95,7 +96,8 @@ const Purchases = () => {
   const subtotal = items.reduce((acc, curr) => {
     const qty = Number(curr.quantity) || 0;
     const cost = Number(curr.unitCost) || 0;
-    return acc + (qty * cost);
+    const disc = Number(curr.discount) || 0;
+    return acc + Math.max(0, (qty * cost) - disc);
   }, 0);
 
   const calculatedDiscountAmount = discountType === "%"
@@ -151,7 +153,8 @@ const Purchases = () => {
         items: validItems.map(it => ({
           productId: Number(it.productId),
           quantity: Number(it.quantity),
-          unitCost: Number(it.unitCost)
+          unitCost: Number(it.unitCost),
+          discount: Number(it.discount) || 0
         }))
       };
 
@@ -246,7 +249,7 @@ const Purchases = () => {
                 >
                   <option value="">Select Supplier</option>
                   {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} (Bal: Rs.{Number(s.balance).toFixed(0)})</option>
+                    <option key={s.id} value={s.id}>{s.name} (Bal: Rs. {formatCurrencyNoDecimals(s.balance)} )</option>
                   ))}
                 </select>
               </div>
@@ -323,10 +326,22 @@ const Purchases = () => {
                       />
                     </div>
 
+                    <div className="w-full md:w-32">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Discount (PKR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0.00"
+                        value={item.discount}
+                        onChange={(e) => handleItemChange(index, "discount", e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                      />
+                    </div>
+
                     <div className="w-full md:w-36">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Line Subtotal</label>
                       <div className="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-850 rounded-lg text-sm text-slate-500 text-right font-semibold select-none">
-                        Rs. {((Number(item.quantity) || 0) * (Number(item.unitCost) || 0)).toFixed(2)}
+                        Rs. {formatCurrency(Math.max(0, (Number(item.quantity) || 0) * (Number(item.unitCost) || 0) - (Number(item.discount) || 0)))}
                       </div>
                     </div>
 
@@ -353,7 +368,7 @@ const Purchases = () => {
                   <div className="flex flex-wrap gap-4">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Consignment Discount</label>
+                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Discount</label>
                         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
                           <button
                             type="button"
@@ -393,7 +408,7 @@ const Purchases = () => {
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">
-                        Credit Applied (Max: Rs. {availCredit.toFixed(0)})
+                        Credit Applied (Max: Rs. {formatCurrencyNoDecimals(availCredit)})
                       </label>
                       <input
                         type="number"
@@ -407,7 +422,7 @@ const Purchases = () => {
                       />
                       {availCredit > 0 && (
                         <span className="text-[10px] text-sky-500 font-semibold block mt-1">
-                          Available Credit: Rs. {availCredit.toFixed(2)}
+                          Available Credit: Rs. {formatCurrency(availCredit)}
                         </span>
                       )}
                     </div>
@@ -416,32 +431,32 @@ const Purchases = () => {
                   <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-right w-full md:w-80 space-y-1.5">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Items Subtotal:</span>
-                      <span className="font-semibold">Rs. {subtotal.toFixed(2)}</span>
+                      <span className="font-semibold">Rs. {formatCurrency(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-rose-500">
                       <span>Consignment Discount:</span>
                       <span className="font-semibold text-rose-600 dark:text-rose-400">
                         {discountType === "%"
-                          ? `- ${Number(discount || 0)}% (Rs. ${calculatedDiscountAmount.toFixed(2)})`
-                          : `- Rs. ${Number(discount || 0).toFixed(2)}`}
+                          ? `- ${Number(discount || 0)}% (Rs. ${formatCurrency(calculatedDiscountAmount)})`
+                          : `- Rs. ${formatCurrency(Number(discount || 0))}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5">
                       <span>Total Cost:</span>
-                      <span className="font-semibold">Rs. {total.toFixed(2)}</span>
+                      <span className="font-semibold">Rs. {formatCurrency(total)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-400">
                       <span>Amount Paid (Cash):</span>
-                      <span className="font-semibold">- Rs. {Number(paidAmount || 0).toFixed(2)}</span>
+                      <span className="font-semibold">- Rs. {formatCurrency(Number(paidAmount || 0))}</span>
                     </div>
                     <div className="flex justify-between text-xs text-blue-500">
                       <span>Credit Applied:</span>
-                      <span className="font-semibold">- Rs. {Number(creditApplied || 0).toFixed(2)}</span>
+                      <span className="font-semibold">- Rs. {formatCurrency(Number(creditApplied || 0))}</span>
                     </div>
                     <div className="flex justify-between text-sm font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-950 dark:text-white">
                       <span>Balance Due:</span>
                       <span className="text-sky-600 dark:text-sky-400">
-                        Rs. {Math.max(0, total - (Number(paidAmount) || 0) - (Number(creditApplied) || 0)).toFixed(2)}
+                        Rs. {formatCurrency(Math.max(0, total - (Number(paidAmount) || 0) - (Number(creditApplied) || 0)))}
                       </span>
                     </div>
                   </div>
@@ -519,21 +534,21 @@ const Purchases = () => {
                             {purchase.supplier?.name}
                           </td>
                           <td className="px-6 py-4 font-bold text-xs">
-                            Rs. {Number(purchase.total).toFixed(2)}
+                            Rs. {formatCurrency(purchase.total)}
                             {Number(purchase.discount) > 0 && (
                               <div className="text-[10px] text-rose-500 font-semibold mt-0.5">
-                                (Disc: -Rs.{Number(purchase.discount).toFixed(0)})
+                                (Disc: -Rs. {formatCurrencyNoDecimals(purchase.discount)})
                               </div>
                             )}
                           </td>
                           <td className="px-6 py-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                            Rs. {Number(purchase.paidAmount || 0).toFixed(2)}
+                            Rs. {formatCurrency(purchase.paidAmount || 0)}
                           </td>
                           <td className="px-6 py-4 text-xs font-semibold text-blue-500">
-                            Rs. {Number(purchase.creditApplied || 0).toFixed(2)}
+                            Rs. {formatCurrency(purchase.creditApplied || 0)}
                           </td>
                           <td className="px-6 py-4 text-xs font-bold text-slate-900 dark:text-white">
-                            Rs. {Number(purchase.balanceDue || 0).toFixed(2)}
+                            Rs. {formatCurrency(purchase.balanceDue || 0)}
                           </td>
                           <td className="px-6 py-4 text-xs">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${purchase.status === "PAID"
@@ -641,7 +656,7 @@ const Purchases = () => {
                     <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
                     <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
                     <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Unit Cost</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
+                    <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty (pieces)</th>
                     <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>Total</th>
                   </tr>
                 </thead>
@@ -652,9 +667,9 @@ const Purchases = () => {
                       <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">
                         {item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}
                       </td>
-                      <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{Number(item.unitCost).toFixed(2)}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(item.unitCost)}</td>
                       <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
-                      <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{Number(item.totalCost).toFixed(2)}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(item.totalCost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -665,32 +680,32 @@ const Purchases = () => {
                 <div style={{ minWidth: '300px', fontSize: '12px' }}>
                   <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                     <span>Items Subtotal:</span>
-                    <span style={{ fontWeight: '700' }}>PKR {Number(selectedPurchase.subtotal).toFixed(2)}</span>
+                    <span style={{ fontWeight: '700' }}>PKR {formatCurrency(selectedPurchase.subtotal)}</span>
                   </div>
                   {Number(selectedPurchase.discount) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>Discount Deduct:</span>
-                      <span style={{ fontWeight: '600', color: '#dc2626' }}>- PKR {Number(selectedPurchase.discount).toFixed(2)}</span>
+                      <span style={{ fontWeight: '600', color: '#dc2626' }}>- PKR {formatCurrency(selectedPurchase.discount)}</span>
                     </div>
                   )}
                   <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px' }}>
                     <span style={{ fontWeight: '800', fontSize: '13px' }}>NET TOTAL COST:</span>
-                    <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {Number(selectedPurchase.total).toFixed(2)}</span>
+                    <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {formatCurrency(selectedPurchase.total)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
                     <span>Amount Paid:</span>
-                    <span style={{ fontWeight: '600' }}>PKR {Number(selectedPurchase.paidAmount).toFixed(2)}</span>
+                    <span style={{ fontWeight: '600' }}>PKR {formatCurrency(selectedPurchase.paidAmount)}</span>
                   </div>
                   {Number(selectedPurchase.creditApplied) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#3b82f6' }}>
                       <span>Credit Applied:</span>
-                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedPurchase.creditApplied).toFixed(2)}</span>
+                      <span style={{ fontWeight: '600' }}>PKR {formatCurrency(selectedPurchase.creditApplied)}</span>
                     </div>
                   )}
                   {Number(selectedPurchase.balanceDue) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
                       <span>Balance Due:</span>
-                      <span>PKR {Number(selectedPurchase.balanceDue).toFixed(2)}</span>
+                      <span>PKR {formatCurrency(selectedPurchase.balanceDue)}</span>
                     </div>
                   )}
                 </div>

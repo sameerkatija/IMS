@@ -4,6 +4,7 @@ import api from "../services/api";
 import { BarChart3, Calendar, FileText, Printer, AlertTriangle, ArrowRight, ArrowLeft, TrendingUp, DollarSign, Wallet } from "lucide-react";
 import Toast from "../components/Toast";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
 
 const CHART_COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#3b82f6", "#14b8a6"];
 
@@ -351,7 +352,7 @@ const Reports = () => {
             <div className="space-y-6">
 
               {/* ===== TOP KPI CARDS ===== */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Gross Profit */}
                 <div className={`p-6 rounded-2xl border shadow-sm ${
                   Number(profitData) >= 0
@@ -382,6 +383,16 @@ const Reports = () => {
                   <p className="text-xs font-semibold mt-1 text-rose-400">▼ Operating Costs</p>
                 </div>
 
+                {/* Purchase Discounts Received */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
+                  <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Purchase Discounts</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Saved from supplier ingestions</p>
+                  <h3 className="text-2xl font-black mt-3 text-emerald-600 dark:text-emerald-400">
+                    Rs. {Number(netProfitData?.purchaseDiscounts || 0).toLocaleString()}
+                  </h3>
+                  <p className="text-xs font-semibold mt-1 text-emerald-500">▲ Cost Savings</p>
+                </div>
+
                 {/* Net Profit */}
                 <div className={`p-6 rounded-2xl border shadow-sm ${
                   (netProfitData?.netProfit ?? 0) >= 0
@@ -391,7 +402,7 @@ const Reports = () => {
                   <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">
                     {(netProfitData?.netProfit ?? 0) >= 0 ? "Net Profit" : "Net Loss"}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">After all expenses deducted</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Overheads &amp; discounts factored</p>
                   <h3 className={`text-2xl font-black mt-3 ${
                     (netProfitData?.netProfit ?? 0) >= 0 ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                   }`}>
@@ -683,11 +694,11 @@ const Reports = () => {
                         {receivables.map((rec) => (
                           <tr key={rec.customerId} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
                             <td className="px-6 py-4 font-semibold text-slate-950 dark:text-white capitalize">{rec.customerName}</td>
-                            <td className="px-6 py-4 text-right font-medium text-slate-500">Rs. {rec.aging["0-30 days"].toFixed(0)}</td>
-                            <td className="px-6 py-4 text-right font-medium text-amber-500">Rs. {rec.aging["31-60 days"].toFixed(0)}</td>
-                            <td className="px-6 py-4 text-right font-medium text-rose-500">Rs. {rec.aging["60+ days"].toFixed(0)}</td>
+                            <td className="px-6 py-4 text-right font-medium text-slate-500">Rs. {formatCurrencyNoDecimals(rec.aging["0-30 days"])}</td>
+                            <td className="px-6 py-4 text-right font-medium text-amber-500">Rs. {formatCurrencyNoDecimals(rec.aging["31-60 days"])}</td>
+                            <td className="px-6 py-4 text-right font-medium text-rose-500">Rs. {formatCurrencyNoDecimals(rec.aging["60+ days"])}</td>
                             <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-455">
-                              Rs. {Number(rec.outstandingBalance).toFixed(2)}
+                              Rs. {formatCurrency(rec.outstandingBalance)}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button
@@ -787,13 +798,13 @@ const Reports = () => {
                             </td>
                             <td className="px-4 py-2.5 text-slate-500">{ent.description || <span className="italic text-slate-400">No details</span>}</td>
                             <td className="px-4 py-2.5 text-right font-semibold text-rose-500">
-                              {Number(ent.debit) > 0 ? `Rs. ${Number(ent.debit).toFixed(2)}` : "-"}
+                              {Number(ent.debit) > 0 ? `Rs. ${formatCurrency(ent.debit)}` : "-"}
                             </td>
                             <td className="px-4 py-2.5 text-right font-semibold text-emerald-500">
-                              {Number(ent.credit) > 0 ? `Rs. ${Number(ent.credit).toFixed(2)}` : "-"}
+                              {Number(ent.credit) > 0 ? `Rs. ${formatCurrency(ent.credit)}` : "-"}
                             </td>
                             <td className="px-4 py-2.5 text-right font-black text-slate-950 dark:text-white">
-                              Rs. {Number(ent.balance).toFixed(2)}
+                              Rs. {formatCurrency(ent.balance)}
                             </td>
                           </tr>
                         ))}
@@ -846,7 +857,7 @@ const Reports = () => {
                             <td className="px-6 py-4 font-semibold text-slate-950 dark:text-white capitalize">{pay.supplierName}</td>
                             <td className="px-6 py-4 text-slate-500 font-mono text-xs">{pay.phone || <span className="italic text-slate-400">No contact</span>}</td>
                             <td className="px-6 py-4 text-right font-bold text-amber-600 dark:text-amber-455">
-                              Rs. {Number(pay.outstandingBalance).toFixed(2)}
+                              Rs. {formatCurrency(pay.outstandingBalance)}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button
@@ -946,13 +957,13 @@ const Reports = () => {
                             </td>
                             <td className="px-4 py-2.5 text-slate-500">{ent.notes || <span className="italic text-slate-450">No details</span>}</td>
                             <td className="px-4 py-2.5 text-right font-semibold text-emerald-500">
-                              {Number(ent.debit) > 0 ? `Rs. ${Number(ent.debit).toFixed(2)}` : "-"}
+                              {Number(ent.debit) > 0 ? `Rs. ${formatCurrency(ent.debit)}` : "-"}
                             </td>
                             <td className="px-4 py-2.5 text-right font-semibold text-rose-500">
-                              {Number(ent.credit) > 0 ? `Rs. ${Number(ent.credit).toFixed(2)}` : "-"}
+                              {Number(ent.credit) > 0 ? `Rs. ${formatCurrency(ent.credit)}` : "-"}
                             </td>
                             <td className="px-4 py-2.5 text-right font-black text-slate-950 dark:text-white">
-                              Rs. {Number(ent.balance).toFixed(2)}
+                              Rs. {formatCurrency(ent.balance)}
                             </td>
                           </tr>
                         ))}
