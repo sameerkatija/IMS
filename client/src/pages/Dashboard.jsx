@@ -337,7 +337,7 @@ const Dashboard = () => {
                   metrics.topProducts?.map((p, idx) => (
                     <tr key={idx} className="text-slate-700 dark:text-slate-350">
                       <td className="py-3 font-mono font-bold">{p.sku || "-"}</td>
-                      <td className="py-3 font-semibold text-slate-900 dark:text-white capitalize">{p.name}</td>
+                      <td className="py-3 font-semibold text-slate-900 dark:text-white capitalize">{p.name}{p.size ? ` (${p.size})` : ""}</td>
                       <td className="py-3 text-right font-black text-sky-600 dark:text-sky-400">Rs. {p.revenue.toLocaleString()}</td>
                     </tr>
                   ))

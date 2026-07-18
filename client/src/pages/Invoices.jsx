@@ -795,7 +795,7 @@ const Invoices = () => {
                   <tbody>
                     {selectedInvoice.items?.map((item) => (
                       <tr key={item.id}>
-                        <td className="py-1 capitalize">{item.product?.name}</td>
+                        <td className="py-1 capitalize">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
                         <td className="py-1 text-right">{item.quantity}</td>
                         <td className="py-1 text-right">{Number(item.unitPrice).toFixed(0)}</td>
                         <td className="py-1 text-right font-bold">{Number(item.totalPrice).toFixed(0)}</td>
@@ -897,7 +897,7 @@ const Invoices = () => {
                       return (
                         <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
                           <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
-                          <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}</td>
+                          <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{tpRate.toFixed(2)}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{invoiceDiscount > 0 ? `${discPct.toFixed(0)}%` : '0%'}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{discAmt.toFixed(2)}</td>

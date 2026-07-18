@@ -630,7 +630,9 @@ async function salesByProduct(from, to) {
   const productSales = {};
 
   for (const item of items) {
-    const name = item.product?.name || "Unknown Product";
+    const name = item.product
+      ? `${item.product.name}${item.product.size ? ` (${item.product.size})` : ""}`
+      : "Unknown Product";
     const subtotal = Number(item.invoice?.subtotal || 0);
     const total = Number(item.invoice?.total || 0);
     const ratio = subtotal > 0 ? (total / subtotal) : 1;
@@ -640,7 +642,9 @@ async function salesByProduct(from, to) {
   }
 
   for (const item of returnedItems) {
-    const name = item.product?.name || "Unknown Product";
+    const name = item.product
+      ? `${item.product.name}${item.product.size ? ` (${item.product.size})` : ""}`
+      : "Unknown Product";
     const amount = Number(item.totalPrice) || 0;
     productSales[name] = (productSales[name] || 0) - amount;
   }

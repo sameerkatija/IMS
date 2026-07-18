@@ -177,9 +177,17 @@ const Purchases = () => {
     }
   };
 
-  const openDetail = (purchase) => {
-    setSelectedPurchase(purchase);
-    setIsDetailOpen(true);
+  const openDetail = async (purchase) => {
+    try {
+      const response = await api.get(`/api/purchase/${purchase.id}`);
+      if (response.data && response.data.type === "success") {
+        setSelectedPurchase(response.data.data);
+        setIsDetailOpen(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setToast({ message: "Failed to load purchase receipt details.", type: "error" });
+    }
   };
 
   const handlePrint = () => {
@@ -225,7 +233,7 @@ const Purchases = () => {
         /* Create Purchase Form View */
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm max-w-4xl mx-auto no-print">
           <h2 className="text-lg font-bold mb-4">Record Stock Ingest</h2>
-          
+
           <form onSubmit={handlePurchaseSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -528,13 +536,12 @@ const Purchases = () => {
                             Rs. {Number(purchase.balanceDue || 0).toFixed(2)}
                           </td>
                           <td className="px-6 py-4 text-xs">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              purchase.status === "PAID"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30"
-                                : purchase.status === "PARTIALLY_PAID"
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${purchase.status === "PAID"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30"
+                              : purchase.status === "PARTIALLY_PAID"
                                 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30"
                                 : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900/30"
-                            }`}>
+                              }`}>
                               {purchase.status || "UNPAID"}
                             </span>
                           </td>
@@ -606,107 +613,91 @@ const Purchases = () => {
             </div>
 
             {/* Print Sheet Area */}
-            <div className="print-area space-y-6 text-sm text-slate-800 dark:text-slate-200 font-sans">
-              <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-4">
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-sky-600 dark:text-sky-400">Sameer Distributors</h1>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quetta, Pakistan | FMCG Supply Networks</p>
-                </div>
-                <div className="text-right">
-                  <h2 className="font-mono text-lg font-bold text-slate-900 dark:text-white">{selectedPurchase.purchaseNo}</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Date: {new Date(selectedPurchase.purchaseDate).toLocaleDateString()}
-                  </p>
-                </div>
+            <div className="print-area text-slate-900 dark:text-slate-100 font-sans" style={{ fontSize: '12px' }}>
+              {/* ===== COMPANY HEADER ===== */}
+              <div className="border-b-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ textAlign: 'center', paddingBottom: '10px', marginBottom: '12px' }}>
+                <h1 style={{ fontSize: '20px', fontWeight: '900', margin: '0 0 2px 0', letterSpacing: '0.5px' }}>Sameer Distributors</h1>
+                <p className="text-slate-600 dark:text-slate-300 print:text-slate-800" style={{ fontSize: '11px', margin: '0' }}>Quetta, Pakistan &nbsp;|&nbsp; Contact: 03342320521</p>
               </div>
 
-              {/* Vendor & Client details */}
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
-                <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Vendor Info</p>
-                  <p className="font-bold text-slate-900 dark:text-white mt-0.5 capitalize">{selectedPurchase.supplier?.name}</p>
-                  {selectedPurchase.supplier?.phone && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{selectedPurchase.supplier.phone}</p>}
-                  {selectedPurchase.supplier?.address && <p className="text-xs text-slate-400 mt-0.5">{selectedPurchase.supplier.address}</p>}
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Operator Info</p>
-                  <p className="font-semibold text-slate-900 dark:text-white mt-0.5 capitalize">{selectedPurchase.createdBy?.name || "System"}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Role: {selectedPurchase.createdBy?.role || "Staff"}</p>
-                </div>
+              {/* ===== PURCHASE META ===== */}
+              <div style={{ marginBottom: '12px', lineHeight: '1.8' }}>
+                <p style={{ margin: '0' }}><strong>Purchase No:</strong> {selectedPurchase.purchaseNo}</p>
+                <p style={{ margin: '0' }}><strong>Date:</strong> {new Date(selectedPurchase.purchaseDate).toISOString().split('T')[0]}</p>
+                <p style={{ margin: '0' }}><strong>Supplier:</strong> {selectedPurchase.supplier?.name.toUpperCase()}</p>
+                {selectedPurchase.supplier?.phone && (
+                  <p style={{ margin: '0' }}><strong>Phone:</strong> {selectedPurchase.supplier.phone}</p>
+                )}
+                {selectedPurchase.supplier?.address && (
+                  <p style={{ margin: '0' }}><strong>Address:</strong> {selectedPurchase.supplier.address.toUpperCase()}</p>
+                )}
+                <p style={{ margin: '0' }}><strong>Operator:</strong> {selectedPurchase.createdBy?.name?.toUpperCase() || "SYSTEM"} ({selectedPurchase.createdBy?.role || "Staff"})</p>
               </div>
 
-              {/* Items Table */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 text-slate-400 font-semibold uppercase tracking-wider">
-                      <th className="px-4 py-3">Product Description</th>
-                      <th className="px-4 py-3 text-center">SKU</th>
-                      <th className="px-4 py-3 text-right">Qty (pieces)</th>
-                      <th className="px-4 py-3 text-right">Unit Cost</th>
-                      <th className="px-4 py-3 text-right">Total</th>
+              {/* ===== ITEMS TABLE ===== */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '11px' }}>
+                <thead>
+                  <tr className="bg-slate-100 dark:bg-slate-800 border-t border-b border-slate-900 dark:border-slate-200 print:border-black">
+                    <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
+                    <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
+                    <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Unit Cost</th>
+                    <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
+                    <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPurchase.items?.map((item, idx) => (
+                    <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
+                      <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
+                      <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">
+                        {item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}
+                      </td>
+                      <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{Number(item.unitCost).toFixed(2)}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
+                      <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{Number(item.totalCost).toFixed(2)}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {selectedPurchase.items?.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-white capitalize">{item.product?.name}</td>
-                        <td className="px-4 py-2.5 text-center font-mono text-slate-500 dark:text-slate-400">{item.product?.sku}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold">{item.quantity} pcs</td>
-                        <td className="px-4 py-2.5 text-right">Rs. {Number(item.unitCost).toFixed(2)}</td>
-                        <td className="px-4 py-2.5 text-right font-bold">Rs. {Number(item.totalCost).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
 
-              {/* Summary totals */}
-              <div className="flex justify-end pt-2">
-                <div className="w-64 space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Items Subtotal:</span>
-                    <span className="font-semibold">Rs. {Number(selectedPurchase.subtotal).toFixed(2)}</span>
+              {/* ===== SUMMARY SECTION ===== */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <div style={{ minWidth: '300px', fontSize: '12px' }}>
+                  <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                    <span>Items Subtotal:</span>
+                    <span style={{ fontWeight: '700' }}>PKR {Number(selectedPurchase.subtotal).toFixed(2)}</span>
                   </div>
                   {Number(selectedPurchase.discount) > 0 && (
-                    <div className="flex justify-between text-rose-500">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>Discount Deduct:</span>
-                      <span className="font-semibold">- Rs. {Number(selectedPurchase.discount).toFixed(2)}</span>
+                      <span style={{ fontWeight: '600', color: '#dc2626' }}>- PKR {Number(selectedPurchase.discount).toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-semibold">
-                    <span className="text-slate-400">Grand Total:</span>
-                    <span>Rs. {Number(selectedPurchase.total).toFixed(2)}</span>
+                  <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px' }}>
+                    <span style={{ fontWeight: '800', fontSize: '13px' }}>NET TOTAL COST:</span>
+                    <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {Number(selectedPurchase.total).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <span>Amount Paid (Cash):</span>
-                    <span>Rs. {Number(selectedPurchase.paidAmount || 0).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
+                    <span>Amount Paid:</span>
+                    <span style={{ fontWeight: '600' }}>PKR {Number(selectedPurchase.paidAmount).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-blue-500 font-semibold">
-                    <span>Credit Applied:</span>
-                    <span>Rs. {Number(selectedPurchase.creditApplied || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-950 dark:text-white">
-                    <span>Balance Due:</span>
-                    <span className="text-sky-600 dark:text-sky-400">Rs. {Number(selectedPurchase.balanceDue || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider pt-1 items-center border-t border-slate-200 dark:border-slate-800">
-                    <span className="text-slate-400">Status:</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full ${
-                      selectedPurchase.status === "PAID"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30"
-                        : selectedPurchase.status === "PARTIALLY_PAID"
-                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30"
-                        : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900/30"
-                    }`}>
-                      {selectedPurchase.status || "UNPAID"}
-                    </span>
-                  </div>
+                  {Number(selectedPurchase.creditApplied) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#3b82f6' }}>
+                      <span>Credit Applied:</span>
+                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedPurchase.creditApplied).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {Number(selectedPurchase.balanceDue) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
+                      <span>Balance Due:</span>
+                      <span>PKR {Number(selectedPurchase.balanceDue).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {selectedPurchase.description && (
-                <div className="border-t border-slate-100 dark:border-slate-800 pt-4 text-xs italic text-slate-400">
+                <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
                   Notes: {selectedPurchase.description}
                 </div>
               )}
