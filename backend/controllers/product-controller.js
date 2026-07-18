@@ -106,13 +106,23 @@ const create = async (req, res) => {
             })
         }
 
-        const existingSku = await product.getBySKU(req.body.sku);
+        let sku = req.body.sku;
+        if (sku === "") sku = null;
+        req.body.sku = sku;
 
-        if (existingSku) {
-            return res.status(400).json({
-                type: "error",
-                message: "SKU already exists.",
-            });
+        if (req.body.size === "") {
+            req.body.size = null;
+        }
+
+        if (sku) {
+            const existingSku = await product.getBySKU(sku);
+
+            if (existingSku) {
+                return res.status(400).json({
+                    type: "error",
+                    message: "SKU already exists.",
+                });
+            }
         }
 
         if (req.body.barcode) {
@@ -178,13 +188,21 @@ const update = async (req, res) => {
             });
         }
 
-        if (
-            req.body.sku &&
-            req.body.sku !== existing.sku
-        ) {
-            const sku = await product.getBySKU(req.body.sku);
+        let sku = req.body.sku;
+        if (sku === "") sku = null;
+        req.body.sku = sku;
 
-            if (sku) {
+        if (req.body.size === "") {
+            req.body.size = null;
+        }
+
+        if (
+            sku &&
+            sku !== existing.sku
+        ) {
+            const existingSku = await product.getBySKU(sku);
+
+            if (existingSku) {
                 return res.status(400).json({
                     type: "error",
                     message: "SKU already exists.",

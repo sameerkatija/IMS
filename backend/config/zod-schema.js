@@ -144,10 +144,17 @@ exports.productSchema = z.object({
     .optional()
     .nullable(),
   sku: z
-    .string({ required_error: "SKU is required." })
+    .string()
     .trim()
-    .min(2, { message: "SKU must be at least 2 characters." })
-    .max(50, { message: "SKU cannot exceed 50 characters." }),
+    .max(50, { message: "SKU cannot exceed 50 characters." })
+    .optional()
+    .nullable(),
+  size: z
+    .string()
+    .trim()
+    .max(50, { message: "Size cannot exceed 50 characters." })
+    .optional()
+    .nullable(),
   categoryId: z
     .coerce.number({ required_error: "Category ID is required.", invalid_type_error: "Category ID must be a number." })
     .int({ message: "Category ID must be a valid integer." })

@@ -208,12 +208,20 @@ function getPurchaseReturnById(id) {
               id: true,
               name: true,
               sku: true,
+              size: true,
               barcode: true,
             },
           },
         },
       },
       supplier: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+        },
+      },
       purchase: {
         select: {
           id: true,

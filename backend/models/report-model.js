@@ -34,8 +34,13 @@ async function getDashboardMetrics() {
     payablesAgg,
     lowStockRes,
     monthExpensesAgg,
-    topProductsRaw,
-    monthGrossProfitRes,
+    monthSalesItems,
+    topProductsReturnsRaw,
+    monthCOGSRes,
+    todayReturnsAgg,
+    weekReturnsAgg,
+    monthReturnsAgg,
+    monthCashRefundAgg,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
@@ -66,63 +71,129 @@ async function getDashboardMetrics() {
       _sum: { amount: true },
       where: { expenseDate: { gte: monthStart, lt: monthEnd } },
     }),
-    prisma.invoiceItem.groupBy({
-      by: ["productId"],
-      _sum: { totalPrice: true },
+    prisma.invoiceItem.findMany({
       where: {
         invoice: { invoiceDate: { gte: monthStart, lt: monthEnd } },
       },
-      orderBy: {
-        _sum: { totalPrice: "desc" },
+      include: {
+        invoice: { select: { total: true, subtotal: true } },
       },
-      take: 5,
+    }),
+    prisma.salesReturnItem.groupBy({
+      by: ["productId"],
+      _sum: { totalPrice: true },
+      where: {
+        salesReturn: { returnDate: { gte: monthStart, lt: monthEnd } },
+      },
     }),
     prisma.$queryRaw`
-      SELECT (
-        SELECT COALESCE(SUM(total), 0)
-        FROM "Invoice"
-        WHERE "invoiceDate" >= ${monthStart} AND "invoiceDate" < ${monthEnd}
-      )::numeric -
-      COALESCE(
-        SUM(ii."costPriceAtSale" * ii.quantity),
-        0
-      )::numeric AS profit
+      SELECT COALESCE(SUM(ii."costPriceAtSale" * ii.quantity), 0)::numeric AS cogs
       FROM "InvoiceItem" ii
       JOIN "Invoice" i ON ii."invoiceId" = i.id
       WHERE i."invoiceDate" >= ${monthStart} AND i."invoiceDate" < ${monthEnd}
     `,
+    prisma.salesReturn.aggregate({
+      _sum: { totalAmount: true },
+      where: { returnDate: { gte: todayStart, lte: todayEnd } },
+    }),
+    prisma.salesReturn.aggregate({
+      _sum: { totalAmount: true },
+      where: { returnDate: { gte: weekStart } },
+    }),
+    prisma.salesReturn.aggregate({
+      _sum: { totalAmount: true },
+      where: { returnDate: { gte: monthStart, lt: monthEnd } },
+    }),
+    prisma.salesReturn.aggregate({
+      _sum: { totalAmount: true },
+      where: {
+        returnDate: { gte: monthStart, lt: monthEnd },
+        refundType: "CASH",
+      },
+    }),
   ]);
 
-  const todaySales = Number(todaySalesAgg._sum.total || 0);
-  const weekSales = Number(weekSalesAgg._sum.total || 0);
-  const monthSales = Number(monthSalesAgg._sum.total || 0);
-  const monthCashReceived = Number(monthSalesAgg._sum.paidAmount || 0);
+  const todaySalesReturn = Number(todayReturnsAgg._sum.totalAmount || 0);
+  const weekSalesReturn = Number(weekReturnsAgg._sum.totalAmount || 0);
+  const monthSalesReturn = Number(monthReturnsAgg._sum.totalAmount || 0);
+  const monthCashRefund = Number(monthCashRefundAgg._sum.totalAmount || 0);
+
+  const todaySales = Math.max(0, Number(todaySalesAgg._sum.total || 0) - todaySalesReturn);
+  const weekSales = Math.max(0, Number(weekSalesAgg._sum.total || 0) - weekSalesReturn);
+  const monthSales = Math.max(0, Number(monthSalesAgg._sum.total || 0) - monthSalesReturn);
+  const monthCashReceived = Math.max(0, Number(monthSalesAgg._sum.paidAmount || 0) - monthCashRefund);
+
   const totalReceivables = Number(receivablesAgg._sum.balance || 0);
   const totalPayables = Number(payablesAgg._sum.balance || 0);
   const lowStockCount = lowStockRes[0]?.count ?? 0;
   const monthExpenses = Number(monthExpensesAgg._sum.amount || 0);
-  const monthGrossProfit = Number(monthGrossProfitRes[0]?.profit || 0);
+
+  // Compute returned COGS for gross profit calculation
+  const monthSalesReturns = await prisma.salesReturn.findMany({
+    where: { returnDate: { gte: monthStart, lt: monthEnd } },
+    include: {
+      items: {
+        include: {
+          product: {
+            select: { costPrice: true }
+          }
+        }
+      }
+    }
+  });
+
+  let monthReturnedCOGS = 0;
+  for (const ret of monthSalesReturns) {
+    for (const item of ret.items) {
+      monthReturnedCOGS += item.quantity * Number(item.product.costPrice);
+    }
+  }
+
+  const monthCOGS = Number(monthCOGSRes[0]?.cogs || 0);
+  const monthGrossProfit = monthSales - (monthCOGS - monthReturnedCOGS);
   const monthNetProfit = monthGrossProfit - monthExpenses;
 
-  // Resolve top products details
+  // Resolve top products details with sales returns deducted and invoice discounts factored in
+  const netRevenueMap = {};
+  for (const item of monthSalesItems) {
+    const subtotal = Number(item.invoice?.subtotal || 0);
+    const total = Number(item.invoice?.total || 0);
+    const ratio = subtotal > 0 ? (total / subtotal) : 1;
+    const netItemPrice = Number(item.totalPrice) * ratio;
+
+    netRevenueMap[item.productId] = (netRevenueMap[item.productId] || 0) + netItemPrice;
+  }
+  for (const item of topProductsReturnsRaw) {
+    const prodId = item.productId;
+    netRevenueMap[prodId] = (netRevenueMap[prodId] || 0) - Number(item._sum.totalPrice || 0);
+  }
+
+  const sortedProductRevenues = Object.entries(netRevenueMap)
+    .map(([productId, revenue]) => ({ productId: Number(productId), revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+
   const topProducts = [];
-  for (const item of topProductsRaw) {
+  for (const item of sortedProductRevenues) {
     const product = await prisma.product.findUnique({
       where: { id: item.productId },
-      select: { id: true, name: true, sku: true },
+      select: { id: true, name: true, sku: true, size: true },
     });
     topProducts.push({
       productId: item.productId,
       name: product?.name || "Unknown",
       sku: product?.sku || "",
-      revenue: Number(item._sum.totalPrice || 0),
+      size: product?.size || null,
+      revenue: item.revenue,
     });
   }
 
   return {
     todaySales,
+    todaySalesReturn,
     weekSales,
     monthSales,
+    monthSalesReturn,
     monthCashReceived,
     totalReceivables,
     totalPayables,
@@ -284,6 +355,7 @@ async function currentStockReport() {
       id: p.id,
       name: p.name,
       sku: p.sku,
+      size: p.size,
       stockQuantity: qty,
       costPrice: cost,
       sellingPrice: selling,
@@ -305,7 +377,7 @@ async function currentStockReport() {
 async function lowStockReport() {
   return prisma.$queryRaw`
     SELECT 
-      id, name, sku, "stockQuantity", "lowStockLevel",
+      id, name, sku, size, "stockQuantity", "lowStockLevel",
       ("stockQuantity" - "lowStockLevel") AS deficiency
     FROM "Product"
     WHERE "isActive" = true AND "stockQuantity" <= "lowStockLevel"
@@ -389,22 +461,45 @@ async function profitReport(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const result = await prisma.$queryRaw`
-    SELECT (
-      SELECT COALESCE(SUM(total), 0)
-      FROM "Invoice"
-      WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
-    )::numeric -
-    COALESCE(
-      SUM(ii."costPriceAtSale" * ii.quantity),
-      0
-    )::numeric AS profit
-    FROM "InvoiceItem" ii
-    JOIN "Invoice" i ON ii."invoiceId" = i.id
-    WHERE i."invoiceDate" >= ${fromDate} AND i."invoiceDate" <= ${toDate}
-  `;
+  // Fetch sales returns in the period to calculate returned revenue and returned COGS
+  const salesReturns = await prisma.salesReturn.findMany({
+    where: { returnDate: { gte: fromDate, lte: toDate } },
+    include: {
+      items: {
+        include: {
+          product: { select: { costPrice: true } }
+        }
+      }
+    }
+  });
 
-  return Number(result[0]?.profit || 0);
+  let returnedRevenue = 0;
+  let returnedCOGS = 0;
+  for (const ret of salesReturns) {
+    returnedRevenue += Number(ret.totalAmount || 0);
+    for (const item of ret.items) {
+      returnedCOGS += item.quantity * Number(item.product.costPrice);
+    }
+  }
+
+  const [totalSalesAgg, cogsRes] = await Promise.all([
+    prisma.invoice.aggregate({
+      _sum: { total: true },
+      where: { invoiceDate: { gte: fromDate, lte: toDate } },
+    }),
+    prisma.$queryRaw`
+      SELECT COALESCE(SUM(ii."costPriceAtSale" * ii.quantity), 0)::numeric AS cogs
+      FROM "InvoiceItem" ii
+      JOIN "Invoice" i ON ii."invoiceId" = i.id
+      WHERE i."invoiceDate" >= ${fromDate} AND i."invoiceDate" <= ${toDate}
+    `
+  ]);
+
+  const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
+  const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
+  const grossProfit = sales - cogs;
+
+  return grossProfit;
 }
 
 async function expenseReport(from, to) {
@@ -447,17 +542,34 @@ async function netProfitReport(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const [grossProfitRes, expensesAgg] = await Promise.all([
+  // Fetch sales returns in the period to calculate returned revenue and returned COGS
+  const salesReturns = await prisma.salesReturn.findMany({
+    where: { returnDate: { gte: fromDate, lte: toDate } },
+    include: {
+      items: {
+        include: {
+          product: { select: { costPrice: true } }
+        }
+      }
+    }
+  });
+
+  let returnedRevenue = 0;
+  let returnedCOGS = 0;
+  for (const ret of salesReturns) {
+    returnedRevenue += Number(ret.totalAmount || 0);
+    for (const item of ret.items) {
+      returnedCOGS += item.quantity * Number(item.product.costPrice);
+    }
+  }
+
+  const [totalSalesAgg, cogsRes, expensesAgg] = await Promise.all([
+    prisma.invoice.aggregate({
+      _sum: { total: true },
+      where: { invoiceDate: { gte: fromDate, lte: toDate } },
+    }),
     prisma.$queryRaw`
-      SELECT (
-        SELECT COALESCE(SUM(total), 0)
-        FROM "Invoice"
-        WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
-      )::numeric -
-      COALESCE(
-        SUM(ii."costPriceAtSale" * ii.quantity),
-        0
-      )::numeric AS profit
+      SELECT COALESCE(SUM(ii."costPriceAtSale" * ii.quantity), 0)::numeric AS cogs
       FROM "InvoiceItem" ii
       JOIN "Invoice" i ON ii."invoiceId" = i.id
       WHERE i."invoiceDate" >= ${fromDate} AND i."invoiceDate" <= ${toDate}
@@ -470,7 +582,9 @@ async function netProfitReport(from, to) {
     }),
   ]);
 
-  const grossProfit = Number(grossProfitRes[0]?.profit || 0);
+  const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
+  const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
+  const grossProfit = sales - cogs;
   const totalExpenses = Number(expensesAgg._sum.amount || 0);
   const netProfit = grossProfit - totalExpenses;
 
@@ -488,6 +602,7 @@ async function salesByProduct(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
+  // Fetch invoice items
   const items = await prisma.invoiceItem.findMany({
     where: {
       invoice: {
@@ -496,14 +611,38 @@ async function salesByProduct(from, to) {
     },
     include: {
       product: true,
+      invoice: { select: { total: true, subtotal: true } },
+    },
+  });
+
+  // Fetch returned items
+  const returnedItems = await prisma.salesReturnItem.findMany({
+    where: {
+      salesReturn: {
+        returnDate: { gte: fromDate, lte: toDate },
+      },
+    },
+    include: {
+      product: true,
     },
   });
 
   const productSales = {};
+
   for (const item of items) {
     const name = item.product?.name || "Unknown Product";
+    const subtotal = Number(item.invoice?.subtotal || 0);
+    const total = Number(item.invoice?.total || 0);
+    const ratio = subtotal > 0 ? (total / subtotal) : 1;
+    const netItemPrice = Number(item.totalPrice) * ratio;
+
+    productSales[name] = (productSales[name] || 0) + netItemPrice;
+  }
+
+  for (const item of returnedItems) {
+    const name = item.product?.name || "Unknown Product";
     const amount = Number(item.totalPrice) || 0;
-    productSales[name] = (productSales[name] || 0) + amount;
+    productSales[name] = (productSales[name] || 0) - amount;
   }
 
   return Object.entries(productSales)
@@ -518,6 +657,7 @@ async function salesByCategory(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
+  // Fetch invoice items
   const items = await prisma.invoiceItem.findMany({
     where: {
       invoice: {
@@ -530,14 +670,42 @@ async function salesByCategory(from, to) {
           category: true,
         },
       },
+      invoice: { select: { total: true, subtotal: true } },
+    },
+  });
+
+  // Fetch returned items
+  const returnedItems = await prisma.salesReturnItem.findMany({
+    where: {
+      salesReturn: {
+        returnDate: { gte: fromDate, lte: toDate },
+      },
+    },
+    include: {
+      product: {
+        include: {
+          category: true,
+        },
+      },
     },
   });
 
   const categorySales = {};
+
   for (const item of items) {
     const name = item.product?.category?.name || "Uncategorized";
+    const subtotal = Number(item.invoice?.subtotal || 0);
+    const total = Number(item.invoice?.total || 0);
+    const ratio = subtotal > 0 ? (total / subtotal) : 1;
+    const netItemPrice = Number(item.totalPrice) * ratio;
+
+    categorySales[name] = (categorySales[name] || 0) + netItemPrice;
+  }
+
+  for (const item of returnedItems) {
+    const name = item.product?.category?.name || "Uncategorized";
     const amount = Number(item.totalPrice) || 0;
-    categorySales[name] = (categorySales[name] || 0) + amount;
+    categorySales[name] = (categorySales[name] || 0) - amount;
   }
 
   return Object.entries(categorySales)

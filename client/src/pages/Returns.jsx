@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { RotateCcw, Plus, Calendar, ArrowRight, Clipboard, Trash2, ArrowLeftRight, Check, ShieldAlert } from "lucide-react";
+import { RotateCcw, Plus, Calendar, ArrowRight, Clipboard, Trash2, ArrowLeftRight, Check, ShieldAlert, Eye, Printer } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 
@@ -10,6 +10,9 @@ const Returns = () => {
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
+  const [selectedReturnDetail, setSelectedReturnDetail] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailType, setDetailType] = useState(""); // "sales" or "purchase"
   const [submitting, setSubmitting] = useState(false);
 
   // Tab 1: Manual Adjustments
@@ -137,6 +140,27 @@ const Returns = () => {
     }
   }, [activeTab, movementsPage]);
 
+  const openReturnDetail = async (id, type) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/api/${type}-return/${id}`);
+      if (response.data && response.data.type === "success") {
+        setSelectedReturnDetail(response.data.data);
+        setDetailType(type);
+        setIsDetailOpen(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setToast({ message: "Failed to load return details.", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   // Tab 1: Adjustment Submission
   const handleAdjSubmit = async (e) => {
     e.preventDefault();
@@ -198,8 +222,8 @@ const Returns = () => {
         setLoadedInvoice(inv);
         setSalesReturnItems(inv.items.map(it => ({
           productId: it.productId,
-          name: it.product.name,
-          sku: it.product.sku,
+          name: it.product.name + (it.product.size ? ` (${it.product.size})` : ""),
+          sku: it.product.sku || "",
           maxQty: it.quantity,
           quantity: 0,
           unitPrice: Number(it.unitPrice)
@@ -276,7 +300,7 @@ const Returns = () => {
         setLoadedPurchase(purchaseItem);
         setPurchaseReturnItems(purchaseItem.items.map(it => ({
           productId: it.productId,
-          name: it.product?.name || "Product #" + it.productId,
+          name: (it.product?.name || "Product #" + it.productId) + (it.product?.size ? ` (${it.product.size})` : ""),
           sku: it.product?.sku || "",
           maxQty: it.quantity,
           quantity: 0,
@@ -524,7 +548,9 @@ const Returns = () => {
                     >
                       <option value="">Select Product...</option>
                       {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} (Stock: {p.stockQuantity} pcs) [{p.sku}]</option>
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.size ? ` (${p.size})` : ""} (Stock: {p.stockQuantity} pcs){p.sku ? ` [${p.sku}]` : ""}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -685,7 +711,7 @@ const Returns = () => {
                         <div key={item.productId} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/50 gap-3">
                           <div className="flex-1">
                             <p className="font-medium text-slate-900 dark:text-white capitalize">{item.name}</p>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">{item.sku} | Invoiced: {item.maxQty} pcs</p>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">{item.sku ? `${item.sku} | ` : ""}Invoiced: {item.maxQty} pcs</p>
                           </div>
                           <div className="flex items-center space-x-4">
                             <div className="w-24">
@@ -783,6 +809,7 @@ const Returns = () => {
                       <th className="px-6 py-4">Refund Method</th>
                       <th className="px-6 py-4">Reason</th>
                       <th className="px-6 py-4 text-right">Credit Value (PKR)</th>
+                      <th className="px-6 py-4 text-center no-print">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
@@ -804,6 +831,16 @@ const Returns = () => {
                         <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{ret.reason || <span className="italic text-slate-400">No notes</span>}</td>
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-400">
                           Rs. {Number(ret.totalAmount).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-center no-print">
+                          <button
+                            type="button"
+                            onClick={() => openReturnDetail(ret.id, "sales")}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg transition-colors"
+                            title="View Receipt"
+                          >
+                            <Eye size={15} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -881,7 +918,7 @@ const Returns = () => {
                         <div key={item.productId} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/50 gap-3">
                           <div className="flex-1">
                             <p className="font-medium text-slate-900 dark:text-white capitalize">{item.name}</p>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">{item.sku} | Consigned: {item.maxQty} pcs</p>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">{item.sku ? `${item.sku} | ` : ""}Consigned: {item.maxQty} pcs</p>
                           </div>
                           <div className="flex items-center space-x-4">
                             <div className="w-24">
@@ -964,6 +1001,7 @@ const Returns = () => {
                       <th className="px-6 py-4">Supplier</th>
                       <th className="px-6 py-4">Reason</th>
                       <th className="px-6 py-4 text-right">Debit Value (PKR)</th>
+                      <th className="px-6 py-4 text-center no-print">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
@@ -981,6 +1019,16 @@ const Returns = () => {
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-455">
                           Rs. {Number(ret.totalAmount).toFixed(2)}
                         </td>
+                        <td className="px-6 py-4 text-center no-print">
+                          <button
+                            type="button"
+                            onClick={() => openReturnDetail(ret.id, "purchase")}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg transition-colors"
+                            title="View Receipt"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -988,6 +1036,143 @@ const Returns = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Return Details/Receipt Modal */}
+      {isDetailOpen && selectedReturnDetail && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-xl space-y-6">
+            {/* Header controls */}
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 no-print">
+              <h3 className="font-bold text-slate-900 dark:text-white capitalize">
+                {detailType === "sales" ? "Sales Return Receipt" : "Purchase Return Receipt"}
+              </h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handlePrint}
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 transition-colors"
+                >
+                  <Printer size={12} className="mr-1.5" /> Print Receipt
+                </button>
+                <button
+                  onClick={() => setIsDetailOpen(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Print Sheet Area */}
+            <div className="print-area space-y-6 text-sm text-slate-800 dark:text-slate-200 font-sans">
+              <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-sky-600 dark:text-sky-400">Sameer Distributors</h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quetta, Pakistan | FMCG Supply Networks</p>
+                </div>
+                <div className="text-right">
+                  <h2 className="font-mono text-lg font-bold text-slate-900 dark:text-white">
+                    {selectedReturnDetail.returnNo || (detailType === "sales" ? `SR-000${selectedReturnDetail.id}` : `PR-000${selectedReturnDetail.id}`)}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Date: {new Date(selectedReturnDetail.returnDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Vendor & Client details */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">
+                    {detailType === "sales" ? "Customer Info" : "Supplier Info"}
+                  </p>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5 capitalize">
+                    {detailType === "sales"
+                      ? (selectedReturnDetail.customer?.name || "Walk-In counter")
+                      : selectedReturnDetail.supplier?.name}
+                  </p>
+                  {detailType === "sales" ? (
+                    <>
+                      {selectedReturnDetail.customer?.phone && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{selectedReturnDetail.customer.phone}</p>}
+                      {selectedReturnDetail.customer?.address && <p className="text-xs text-slate-400 mt-0.5">{selectedReturnDetail.customer.address}</p>}
+                    </>
+                  ) : (
+                    <>
+                      {selectedReturnDetail.supplier?.phone && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{selectedReturnDetail.supplier.phone}</p>}
+                      {selectedReturnDetail.supplier?.address && <p className="text-xs text-slate-400 mt-0.5">{selectedReturnDetail.supplier.address}</p>}
+                    </>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Reference Details</p>
+                  <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                    {detailType === "sales"
+                      ? `Ref Invoice: ${selectedReturnDetail.invoice?.invoiceNo || "-"}`
+                      : `Ref Purchase: ${selectedReturnDetail.purchase?.purchaseNo || "-"}`}
+                  </p>
+                  {detailType === "sales" && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Refund Method: <span className="font-bold">{selectedReturnDetail.refundType || "CREDIT"}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Operator: <span className="font-semibold capitalize">{selectedReturnDetail.createdBy?.name || "System"}</span> ({selectedReturnDetail.createdBy?.role || "Staff"})
+                  </p>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 text-slate-400 font-semibold uppercase tracking-wider">
+                      <th className="px-4 py-3">Product Description</th>
+                      <th className="px-4 py-3 text-center">SKU</th>
+                      <th className="px-4 py-3 text-right">Qty (pieces)</th>
+                      <th className="px-4 py-3 text-right">{detailType === "sales" ? "Unit Price" : "Unit Cost"}</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {selectedReturnDetail.items?.map((item) => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-white capitalize">
+                          {item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}
+                        </td>
+                        <td className="px-4 py-2.5 text-center font-mono text-slate-500 dark:text-slate-400">
+                          {item.product?.sku || "-"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold">{item.quantity} pcs</td>
+                        <td className="px-4 py-2.5 text-right">
+                          Rs. {Number(detailType === "sales" ? item.unitPrice : item.unitCost).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-bold">
+                          Rs. {Number(detailType === "sales" ? item.totalPrice : item.totalCost).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary totals */}
+              <div className="flex justify-between items-start pt-2">
+                <div className="text-xs text-slate-500 max-w-xs">
+                  <span className="font-semibold block uppercase text-[10px] text-slate-400">Notes / Reason:</span>
+                  <span className="italic block mt-0.5">{selectedReturnDetail.reason || "No notes provided"}</span>
+                </div>
+                <div className="w-64 space-y-1.5 text-xs text-right">
+                  <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-950 dark:text-white">
+                    <span>Total Refund Value:</span>
+                    <span className="text-rose-600 dark:text-rose-400 text-sm">
+                      Rs. {Number(selectedReturnDetail.totalAmount).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

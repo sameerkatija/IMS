@@ -223,6 +223,7 @@ function getPurchaseById(id) {
               id: true,
               name: true,
               sku: true,
+              size: true,
               barcode: true,
             },
           },

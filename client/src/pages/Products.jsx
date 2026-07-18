@@ -24,6 +24,7 @@ const Products = () => {
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
+    size: "",
     barcode: "",
     categoryId: "",
     costPrice: "",
@@ -82,7 +83,8 @@ const Products = () => {
       setSelectedProduct(product);
       setFormData({
         name: product.name,
-        sku: product.sku,
+        sku: product.sku || "",
+        size: product.size || "",
         barcode: product.barcode || "",
         categoryId: product.categoryId.toString(),
         costPrice: product.costPrice.toString(),
@@ -95,6 +97,7 @@ const Products = () => {
       setFormData({
         name: "",
         sku: "",
+        size: "",
         barcode: "",
         categoryId: categories[0]?.id.toString() || "",
         costPrice: "",
@@ -113,7 +116,7 @@ const Products = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.sku || !formData.categoryId || !formData.costPrice || !formData.sellingPrice) {
+    if (!formData.name || !formData.categoryId || !formData.costPrice || !formData.sellingPrice) {
       setToast({ message: "Please fill all required fields.", type: "error" });
       return;
     }
@@ -122,7 +125,8 @@ const Products = () => {
       setSubmitting(true);
       const payload = {
         name: formData.name,
-        sku: formData.sku,
+        sku: formData.sku || null,
+        size: formData.size || null,
         barcode: formData.barcode || null,
         categoryId: Number(formData.categoryId),
         costPrice: Number(formData.costPrice),
@@ -280,11 +284,12 @@ const Products = () => {
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
                         <td className="px-6 py-4">
-                          <div className="font-mono text-xs font-semibold">{p.sku}</div>
+                          <div className="font-mono text-xs font-semibold">{p.sku || "-"}</div>
                           {p.barcode && <div className="text-slate-400 text-xs mt-0.5">{p.barcode}</div>}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-950 dark:text-white capitalize">
-                          {p.name}
+                          <div>{p.name}</div>
+                          {p.size && <div className="text-slate-400 text-xs font-normal mt-0.5">{p.size}</div>}
                         </td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400 capitalize">
                           {p.category?.name}
@@ -394,10 +399,9 @@ const Products = () => {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">SKU Code *</label>
+                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">SKU Code (Optional)</label>
                   <input
                     type="text"
-                    required
                     name="sku"
                     value={formData.sku}
                     onChange={handleInputChange}
@@ -421,6 +425,20 @@ const Products = () => {
                 </div>
 
                 <div>
+                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Size (Optional)</label>
+                  <input
+                    type="text"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Size M, XL, 500ml"
+                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Category *</label>
                   <select
                     name="categoryId"
@@ -433,6 +451,18 @@ const Products = () => {
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Pieces Per Carton (Display helper)</label>
+                  <input
+                    type="number"
+                    name="piecesPerCarton"
+                    value={formData.piecesPerCarton}
+                    onChange={handleInputChange}
+                    placeholder="e.g. 72"
+                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
+                  />
                 </div>
               </div>
 
@@ -476,18 +506,6 @@ const Products = () => {
                     value={formData.lowStockLevel}
                     onChange={handleInputChange}
                     placeholder="0"
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Pieces Per Carton (Display helper)</label>
-                  <input
-                    type="number"
-                    name="piecesPerCarton"
-                    value={formData.piecesPerCarton}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 72"
                     className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
                   />
                 </div>

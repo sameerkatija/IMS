@@ -132,6 +132,7 @@ function listMovements({ where, skip, take }) {
           id: true,
           name: true,
           sku: true,
+          size: true,
           barcode: true,
           stockQuantity: true,
         },

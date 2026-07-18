@@ -107,7 +107,8 @@ model Product {
   id           Int     @id @default(autoincrement())
   name         String
   barcode      String? @unique // optional; not every product is barcoded
-  sku          String  @unique // required internal code, always present
+  sku          String? @unique // optional internal code (complementary)
+  size         String?         // optional product size (e.g. "Size M", "Size L")
   categoryId   Int
   costPrice    Decimal @db.Decimal(12, 2) // what you pay per piece
   sellingPrice Decimal @db.Decimal(12, 2) // what you charge per piece

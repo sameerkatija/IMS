@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
-import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database } from "lucide-react";
+import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database, RotateCcw } from "lucide-react";
 
 const COLORS = ["#0284c7", "#38bdf8", "#0ea5e9", "#7dd3fc", "#bae6fd"];
 
@@ -106,21 +106,41 @@ const Dashboard = () => {
     {
       title: "Today's Sales",
       value: `Rs. ${metrics.todaySales.toLocaleString()}`,
-      description: "Counter & Credit sales today",
+      description: "Counter & Credit sales today (net of returns)",
       icon: TrendingUp,
       color: "text-emerald-500",
-      bg: "bg-emerald-500/10"
+      bg: "bg-emerald-500/10",
+      link: "/invoices"
+    },
+    {
+      title: "Today's Sales Return",
+      value: `Rs. ${(metrics.todaySalesReturn || 0).toLocaleString()}`,
+      description: "Sales returns processed today",
+      icon: RotateCcw,
+      color: "text-rose-500",
+      bg: "bg-rose-500/10",
+      link: "/returns"
     },
     {
       title: "Monthly Sales & Collection",
       value: `Rs. ${metrics.monthSales.toLocaleString()}`,
-      description: "Sales from 1st of month till date",
+      description: "Net sales from 1st of month till date",
       icon: TrendingUp,
       color: "text-sky-600",
       bg: "bg-sky-500/10",
       isMonthlySales: true,
       cashReceived: metrics.monthCashReceived,
-      salesPercentage: metrics.monthSales > 0 ? (metrics.monthCashReceived / metrics.monthSales) * 100 : 0
+      salesPercentage: metrics.monthSales > 0 ? (metrics.monthCashReceived / metrics.monthSales) * 100 : 0,
+      link: "/invoices"
+    },
+    {
+      title: "Monthly Sales Return",
+      value: `Rs. ${(metrics.monthSalesReturn || 0).toLocaleString()}`,
+      description: "Sales returns processed this month",
+      icon: RotateCcw,
+      color: "text-rose-500",
+      bg: "bg-rose-500/10",
+      link: "/returns"
     },
     {
       title: "Total Receivables",
@@ -316,7 +336,7 @@ const Dashboard = () => {
                 ) : (
                   metrics.topProducts?.map((p, idx) => (
                     <tr key={idx} className="text-slate-700 dark:text-slate-350">
-                      <td className="py-3 font-mono font-bold">{p.sku}</td>
+                      <td className="py-3 font-mono font-bold">{p.sku || "-"}</td>
                       <td className="py-3 font-semibold text-slate-900 dark:text-white capitalize">{p.name}</td>
                       <td className="py-3 text-right font-black text-sky-600 dark:text-sky-400">Rs. {p.revenue.toLocaleString()}</td>
                     </tr>

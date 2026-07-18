@@ -219,12 +219,20 @@ function getSalesReturnById(id) {
               id: true,
               name: true,
               sku: true,
+              size: true,
               barcode: true,
             },
           },
         },
       },
       customer: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+        },
+      },
       invoice: {
         select: {
           id: true,

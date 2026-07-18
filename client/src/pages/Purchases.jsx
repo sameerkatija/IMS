@@ -19,6 +19,7 @@ const Purchases = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [supplierId, setSupplierId] = useState("");
   const [discount, setDiscount] = useState("0");
+  const [discountType, setDiscountType] = useState("PKR"); // default is PKR
   const [paidAmount, setPaidAmount] = useState("0");
   const [creditApplied, setCreditApplied] = useState("0");
   const [description, setDescription] = useState("");
@@ -97,7 +98,11 @@ const Purchases = () => {
     return acc + (qty * cost);
   }, 0);
 
-  const total = Math.max(0, subtotal - (Number(discount) || 0));
+  const calculatedDiscountAmount = discountType === "%"
+    ? (subtotal * (Number(discount) || 0)) / 100
+    : (Number(discount) || 0);
+
+  const total = Math.max(0, subtotal - calculatedDiscountAmount);
 
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
@@ -139,7 +144,7 @@ const Purchases = () => {
 
       const payload = {
         supplierId: Number(supplierId),
-        discount: Number(discount) || 0,
+        discount: calculatedDiscountAmount,
         paidAmount: paid,
         creditApplied: credit,
         description: description || null,
@@ -157,6 +162,7 @@ const Purchases = () => {
         // Reset and close
         setSupplierId("");
         setDiscount("0");
+        setDiscountType("PKR");
         setPaidAmount("0");
         setCreditApplied("0");
         setDescription("");
@@ -276,7 +282,7 @@ const Purchases = () => {
                         <option value="">Search Product...</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} [{p.sku}]
+                            {p.name}{p.size ? ` (${p.size})` : ""}{p.sku ? ` [${p.sku}]` : ""}
                           </option>
                         ))}
                       </select>
@@ -338,7 +344,25 @@ const Purchases = () => {
                 <div className="border-t border-slate-200 dark:border-slate-800 pt-4 flex flex-col md:flex-row md:justify-between items-end gap-4">
                   <div className="flex flex-wrap gap-4">
                     <div>
-                      <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Consignment Discount (PKR)</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Consignment Discount</label>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("PKR")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-sm" : "text-slate-500"}`}
+                          >
+                            PKR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("%")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-sm" : "text-slate-500"}`}
+                          >
+                            %
+                          </button>
+                        </div>
+                      </div>
                       <input
                         type="number"
                         value={discount}
@@ -388,7 +412,11 @@ const Purchases = () => {
                     </div>
                     <div className="flex justify-between text-xs text-rose-500">
                       <span>Consignment Discount:</span>
-                      <span className="font-semibold">- Rs. {Number(discount || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-rose-600 dark:text-rose-400">
+                        {discountType === "%"
+                          ? `- ${Number(discount || 0)}% (Rs. ${calculatedDiscountAmount.toFixed(2)})`
+                          : `- Rs. ${Number(discount || 0).toFixed(2)}`}
+                      </span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5">
                       <span>Total Cost:</span>

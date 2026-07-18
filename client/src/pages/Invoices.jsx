@@ -2,9 +2,18 @@ import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import { Receipt, Plus, Search, Eye, Printer, Trash2, Calendar, User, UserCheck } from "lucide-react";
 import Toast from "../components/Toast";
+import { useAuth } from "../context/AuthContext";
 
 const Invoices = () => {
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
+
+  const calculateInvoiceProfit = (invoice) => {
+    const cogs = (invoice.items || []).reduce((sum, item) => {
+      return sum + Number(item.quantity) * Number(item.costPriceAtSale || 0);
+    }, 0);
+    return Number(invoice.total) - cogs;
+  };
   const [customers, setCustomers] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
   const [products, setProducts] = useState([]);
@@ -154,13 +163,25 @@ const Invoices = () => {
       return;
     }
 
-    // Verify stock availability on submit
+    // Verify stock availability and check cost price restraint
+    let totalCost = 0;
     for (let it of validItems) {
       const p = products.find(prod => prod.id === Number(it.productId));
-      if (p && Number(it.quantity) > p.stockQuantity) {
-        setToast({ message: `Cannot sell ${it.quantity} pieces of ${p.name}. Only ${p.stockQuantity} available.`, type: "error" });
-        return;
+      if (p) {
+        if (Number(it.quantity) > p.stockQuantity) {
+          setToast({ message: `Cannot sell ${it.quantity} pieces of ${p.name}. Only ${p.stockQuantity} available.`, type: "error" });
+          return;
+        }
+        totalCost += Number(it.quantity) * Number(p.costPrice);
       }
+    }
+
+    if (total < totalCost) {
+      setToast({
+        message: `Invoice discount is too high. Net total (Rs. ${total.toFixed(2)}) cannot go below the total cost price of the items (Rs. ${totalCost.toFixed(2)}).`,
+        type: "error"
+      });
+      return;
     }
 
     try {
@@ -364,7 +385,7 @@ const Invoices = () => {
                           <option value="">Select Item...</option>
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name} (Stock: {p.stockQuantity} pcs) [Rs. {Number(p.sellingPrice).toFixed(0)}]
+                              {p.name}{p.size ? ` (${p.size})` : ""} (Stock: {p.stockQuantity} pcs) [Rs. {Number(p.sellingPrice).toFixed(0)}]
                             </option>
                           ))}
                         </select>
@@ -605,6 +626,7 @@ const Invoices = () => {
                         <th className="px-6 py-4 text-center">Sale Type</th>
                         <th className="px-6 py-4 text-right">Items Sold</th>
                         <th className="px-6 py-4 text-right">Invoice Total</th>
+                        {user?.role === "ADMIN" && <th className="px-6 py-4 text-right">Gross Profit</th>}
                         <th className="px-6 py-4 text-right">Received</th>
                         <th className="px-6 py-4 text-right">Remaining</th>
                         <th className="px-6 py-4 text-center">Settlement</th>
@@ -631,8 +653,8 @@ const Invoices = () => {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${inv.saleType === "CREDIT"
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400"
-                                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400"
                               }`}>
                               {inv.saleType}
                             </span>
@@ -643,6 +665,11 @@ const Invoices = () => {
                           <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">
                             Rs. {Number(inv.total).toFixed(2)}
                           </td>
+                          {user?.role === "ADMIN" && (
+                            <td className="px-6 py-4 text-right font-bold text-emerald-600 dark:text-emerald-450">
+                              Rs. {calculateInvoiceProfit(inv).toFixed(2)}
+                            </td>
+                          )}
                           <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-400 font-semibold">
                             Rs. {Number(inv.paidAmount).toFixed(2)}
                           </td>
@@ -651,10 +678,10 @@ const Invoices = () => {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full border ${inv.status === "PAID"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/40"
-                                : inv.status === "PARTIALLY_PAID"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-455 dark:border-amber-900/40"
-                                  : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/40"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/40"
+                              : inv.status === "PARTIALLY_PAID"
+                                ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-455 dark:border-amber-900/40"
+                                : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/40"
                               }`}>
                               {inv.status.replace("_", " ")}
                             </span>
@@ -664,7 +691,7 @@ const Invoices = () => {
                               onClick={() => openDetail(inv)}
                               className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
                             >
-                              <Eye size={12} className="mr-1" /> Open POS Receipt
+                              <Eye size={12} className="mr-1" /> Receipt
                             </button>
                           </td>
                         </tr>
@@ -820,39 +847,39 @@ const Invoices = () => {
                 </div>
               </div>
             ) : (
-              <div className="print-area text-slate-900 dark:text-slate-100 font-sans" style={{fontSize: '12px'}}>
+              <div className="print-area text-slate-900 dark:text-slate-100 font-sans" style={{ fontSize: '12px' }}>
 
                 {/* ===== COMPANY HEADER ===== */}
-                <div className="border-b-2 border-slate-900 dark:border-slate-200 print:border-black" style={{textAlign: 'center', paddingBottom: '10px', marginBottom: '12px'}}>
-                  <h1 style={{fontSize: '20px', fontWeight: '900', margin: '0 0 2px 0', letterSpacing: '0.5px'}}>Sameer Distributors</h1>
-                  <p className="text-slate-600 dark:text-slate-300 print:text-slate-800" style={{fontSize: '11px', margin: '0'}}>Quetta, Pakistan &nbsp;|&nbsp; Contact: 03342320521</p>
+                <div className="border-b-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ textAlign: 'center', paddingBottom: '10px', marginBottom: '12px' }}>
+                  <h1 style={{ fontSize: '20px', fontWeight: '900', margin: '0 0 2px 0', letterSpacing: '0.5px' }}>Sameer Distributors</h1>
+                  <p className="text-slate-600 dark:text-slate-300 print:text-slate-800" style={{ fontSize: '11px', margin: '0' }}>Quetta, Pakistan &nbsp;|&nbsp; Contact: 03342320521</p>
                 </div>
 
                 {/* ===== INVOICE META ===== */}
-                <div style={{marginBottom: '12px', lineHeight: '1.8'}}>
-                  <p style={{margin: '0'}}><strong>Invoice No:</strong> {selectedInvoice.invoiceNo}</p>
-                  <p style={{margin: '0'}}><strong>Date:</strong> {new Date(selectedInvoice.invoiceDate).toISOString().split('T')[0]}</p>
+                <div style={{ marginBottom: '12px', lineHeight: '1.8' }}>
+                  <p style={{ margin: '0' }}><strong>Invoice No:</strong> {selectedInvoice.invoiceNo}</p>
+                  <p style={{ margin: '0' }}><strong>Date:</strong> {new Date(selectedInvoice.invoiceDate).toISOString().split('T')[0]}</p>
                   {selectedInvoice.salesman && (
-                    <p style={{margin: '0'}}><strong>Booker:</strong> {selectedInvoice.salesman.name.toUpperCase()}</p>
+                    <p style={{ margin: '0' }}><strong>Booker:</strong> {selectedInvoice.salesman.name.toUpperCase()}</p>
                   )}
-                  <p style={{margin: '0'}}><strong>Bill To:</strong> {(selectedInvoice.customer?.name || 'Counter Cash Customer').toUpperCase()}</p>
+                  <p style={{ margin: '0' }}><strong>Bill To:</strong> {(selectedInvoice.customer?.name || 'Counter Cash Customer').toUpperCase()}</p>
                   {selectedInvoice.customer?.address && (
-                    <p style={{margin: '0'}}><strong>Address:</strong> {selectedInvoice.customer.address.toUpperCase()}</p>
+                    <p style={{ margin: '0' }}><strong>Address:</strong> {selectedInvoice.customer.address.toUpperCase()}</p>
                   )}
                 </div>
 
                 {/* ===== ITEMS TABLE ===== */}
-                <table style={{width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '11px'}}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '11px' }}>
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-800 border-t border-b border-slate-900 dark:border-slate-200 print:border-black">
-                      <th style={{padding: '5px 6px', textAlign: 'left', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
-                      <th style={{padding: '5px 6px', textAlign: 'left', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">TP Rate</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc %</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc Amt</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Net Rate</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
-                      <th style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}}>Total</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">TP Rate</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc %</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc Amt</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Net Rate</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -869,14 +896,14 @@ const Invoices = () => {
                       const lineTotal = netRate * item.quantity;
                       return (
                         <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
-                          <td style={{padding: '5px 6px', fontWeight: '600'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
-                          <td style={{padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{tpRate.toFixed(2)}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{invoiceDiscount > 0 ? `${discPct.toFixed(0)}%` : '0%'}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{discAmt.toFixed(2)}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{netRate.toFixed(2)}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right', fontWeight: '600'}} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
-                          <td style={{padding: '5px 6px', textAlign: 'right', fontWeight: '700'}}>{lineTotal.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
+                          <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{tpRate.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{invoiceDiscount > 0 ? `${discPct.toFixed(0)}%` : '0%'}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{discAmt.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{netRate.toFixed(2)}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{lineTotal.toFixed(2)}</td>
                         </tr>
                       );
                     })}
@@ -884,36 +911,36 @@ const Invoices = () => {
                 </table>
 
                 {/* ===== SUMMARY SECTION ===== */}
-                <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '4px'}}>
-                  <div style={{minWidth: '300px', fontSize: '12px'}}>
-                    <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{display: 'flex', justifyContent: 'space-between', padding: '4px 0'}}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <div style={{ minWidth: '300px', fontSize: '12px' }}>
+                    <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>Sub Total (After Item Discounts):</span>
-                      <span style={{fontWeight: '700'}}>PKR {(Number(selectedInvoice.subtotal) - Number(selectedInvoice.discount || 0)).toFixed(2)}</span>
+                      <span style={{ fontWeight: '700' }}>PKR {(Number(selectedInvoice.subtotal) - Number(selectedInvoice.discount || 0)).toFixed(2)}</span>
                     </div>
-                    <div style={{display: 'flex', justifyContent: 'space-between', padding: '4px 0'}}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>Invoice Discount {Number(selectedInvoice.discount) > 0 ? '' : '0%'} (PKR {Number(selectedInvoice.discount || 0).toFixed(2)}):</span>
-                      <span style={{fontWeight: '600'}}>PKR {Number(selectedInvoice.discount || 0).toFixed(2)}</span>
+                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedInvoice.discount || 0).toFixed(2)}</span>
                     </div>
-                    <div style={{display: 'flex', justifyContent: 'space-between', padding: '4px 0'}}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>Builty Discount 0% (PKR 0.00):</span>
-                      <span style={{fontWeight: '600'}}>PKR 0.00</span>
+                      <span style={{ fontWeight: '600' }}>PKR 0.00</span>
                     </div>
-                    <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px'}}>
-                      <span style={{fontWeight: '800', fontSize: '13px'}}>NET PAYABLE:</span>
-                      <span style={{fontWeight: '900', fontSize: '13px'}}>PKR {Number(selectedInvoice.total).toFixed(2)}</span>
+                    <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px' }}>
+                      <span style={{ fontWeight: '800', fontSize: '13px' }}>NET PAYABLE:</span>
+                      <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {Number(selectedInvoice.total).toFixed(2)}</span>
                     </div>
                     {Number(selectedInvoice.creditApplied) > 0 && (
-                      <div style={{display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#b45309'}}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#b45309' }}>
                         <span>Store Credit Applied:</span>
-                        <span style={{fontWeight: '600'}}>- PKR {Number(selectedInvoice.creditApplied).toFixed(2)}</span>
+                        <span style={{ fontWeight: '600' }}>- PKR {Number(selectedInvoice.creditApplied).toFixed(2)}</span>
                       </div>
                     )}
-                    <div style={{display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a'}}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
                       <span>Amount Received:</span>
-                      <span style={{fontWeight: '600'}}>PKR {Number(selectedInvoice.paidAmount).toFixed(2)}</span>
+                      <span style={{ fontWeight: '600' }}>PKR {Number(selectedInvoice.paidAmount).toFixed(2)}</span>
                     </div>
                     {Number(selectedInvoice.balanceDue) > 0 && (
-                      <div style={{display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700'}}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
                         <span>Balance Due:</span>
                         <span>PKR {Number(selectedInvoice.balanceDue).toFixed(2)}</span>
                       </div>
@@ -923,11 +950,11 @@ const Invoices = () => {
 
                 {/* ===== FOOTER NOTES ===== */}
                 {selectedInvoice.description && (
-                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic'}}>
+                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
                     Notes: {selectedInvoice.description}
                   </div>
                 )}
-                <div className="border-t border-dashed border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-400" style={{textAlign: 'center', marginTop: '16px', fontSize: '10px', paddingTop: '8px'}}>
+                <div className="border-t border-dashed border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-400" style={{ textAlign: 'center', marginTop: '16px', fontSize: '10px', paddingTop: '8px' }}>
                   Thank you for your business! | Sameer Distributors | 03342320521
                 </div>
               </div>

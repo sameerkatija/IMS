@@ -626,8 +626,10 @@ const Reports = () => {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {lowStockProducts.map((p) => (
                           <tr key={p.id} className="text-slate-700 dark:text-slate-350">
-                            <td className="py-2.5 font-mono">{p.sku}</td>
-                            <td className="py-2.5 font-semibold text-slate-950 dark:text-white capitalize">{p.name}</td>
+                            <td className="py-2.5 font-mono">{p.sku || "-"}</td>
+                            <td className="py-2.5 font-semibold text-slate-950 dark:text-white capitalize">
+                              {p.name}{p.size ? ` (${p.size})` : ""}
+                            </td>
                             <td className="py-2.5 text-center text-slate-400">{p.lowStockLevel} pcs</td>
                             <td className="py-2.5 text-right font-bold text-rose-500">{p.stockQuantity} pcs</td>
                           </tr>
