@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
-import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package } from "lucide-react";
+import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database } from "lucide-react";
 
 const COLORS = ["#0284c7", "#38bdf8", "#0ea5e9", "#7dd3fc", "#bae6fd"];
 
@@ -13,6 +13,7 @@ const Dashboard = () => {
   const [salesTrend, setSalesTrend] = useState([]);
   const [salesmanData, setSalesmanData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [backingUp, setBackingUp] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -55,6 +56,36 @@ const Dashboard = () => {
       console.error("Dashboard metrics load error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBackup = async () => {
+    try {
+      setBackingUp(true);
+      const response = await api.get("/api/system/backup", { responseType: "blob" });
+      
+      const blob = new Blob([response.data], { type: "application/sql" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `backup-${new Date().toISOString().replace(/[:.]/g, "-")}.sql`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+      
+      link.href = downloadUrl;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Backup failed:", err);
+      alert("Failed to download database backup. Make sure you are logged in as an Administrator.");
+    } finally {
+      setBackingUp(false);
     }
   };
 
@@ -141,11 +172,32 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Business Overview</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Welcome back, {user?.name || "operator"}. Here is today's summary for Sameer Distributors.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Business Overview</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Welcome back, {user?.name || "operator"}. Here is today's summary for Sameer Distributors.
+          </p>
+        </div>
+        {user?.role === "ADMIN" && (
+          <button
+            onClick={handleBackup}
+            disabled={backingUp}
+            className="flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg hover:shadow-sky-500/10 active:scale-[0.98] transition-all duration-200"
+          >
+            {backingUp ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Backing up...
+              </>
+            ) : (
+              <>
+                <Database className="mr-2" size={16} />
+                Backup Database
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Stats Cards Grid */}

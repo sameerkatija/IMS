@@ -120,3 +120,30 @@ This flow is used when a customer pays down their overall balance, or when we pa
 ## 7. Reports & Aggregations
 * **Dashboard** (`GET /api/report/dashboard`): Returns running totals. Check that they match your manual database row counts (Receivables, Payables, Monthly Expenses, Low Stock alerts, and Top 5 Selling Products).
 * **Receivables aging** (`GET /api/report/customer-ledger`): Check that customers with outstanding balances have their unpaid invoices grouped correctly into `0-30 days`, `31-60 days`, or `60+ days` buckets based on `invoiceDate`.
+
+---
+
+## 8. Administrative Utilities
+
+### A. Database Cleanup Tool
+* **Trigger CLI command:**
+  ```bash
+  cd backend
+  node scratch/clean-db.js
+  ```
+* **Verification Check:**
+  * Open pgAdmin or connect using `psql` and check tables: all tables must be completely empty (0 rows).
+  * Confirm that you can no longer log in to the client dashboard (as all users have been wiped).
+  * *Registration Verification:* Perform a `POST /api/auth/register` with the `REGISTRATION_SECRET` token or use the signup page. Ensure a new administrator account is created successfully and you can log in.
+
+### B. Database Backup Tool
+* **Trigger UI Event:** Log in as an `ADMIN` user, navigate to the Dashboard page, and click the **Backup Database** button on the top right.
+* **Trigger CLI command:**
+  ```bash
+  cd backend
+  node config/backup-db.js
+  ```
+* **Verification Check:**
+  * For the UI event: Verify that a `.sql` file is downloaded to your browser with a name like `backup-YYYY-MM-DD-HH-MM-SS.sql`.
+  * For the CLI script: Verify that a corresponding `.sql` backup file is generated inside the [backend/backups/](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/backups/) directory.
+  * Inspect the file content: it must contain `TRUNCATE TABLE` statements, `INSERT INTO` statements with all your database records, constraint override tags (`SET session_replication_role = 'replica'`), and sequence resetting commands (`setval(pg_get_serial_sequence(...))`).

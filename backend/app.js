@@ -17,10 +17,23 @@ app.use(cors({
   origin: env.clientUrl,
   credentials: true, // required so the httpOnly JWT cookie is sent/received
 }));
+const fs = require('fs');
+const path = require('path');
+
 app.use(cookieParser(env.cookieSecret)); // for signed cookies
 
 app.use('/api', require('./routes/index'));
-app.use(notFoundHandler);
+
+const distPath = path.join(__dirname, '../client/dist');
+if (fs.existsSync(distPath)) {
+    app.use(Express.static(distPath));
+    app.get(/.*/, (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    app.use(notFoundHandler);
+}
+
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {

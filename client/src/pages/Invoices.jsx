@@ -502,7 +502,12 @@ const Invoices = () => {
                 </div>
                 <div className="flex justify-between text-xs text-rose-500">
                   <span>Discounts Applied:</span>
-                  <span className="font-semibold">- Rs. {Number(discount || 0).toFixed(2)}</span>
+                  <span className="font-semibold">
+                    {discountType === "%"
+                      ? `- ${Number(discount || 0)}% (Rs. ${calculatedDiscountAmount.toFixed(2)})`
+                      : `- Rs. ${Number(discount || 0).toFixed(2)}`
+                    }
+                  </span>
                 </div>
                 {Number(creditApplied) > 0 && (
                   <div className="flex justify-between text-xs text-amber-500">

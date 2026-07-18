@@ -11,7 +11,7 @@ export const Toast = ({ message, type = "success", onClose }) => {
 
   return (
     <div
-      className={`fixed bottom-5 right-5 flex items-center p-4 rounded-xl border shadow-xl z-50 transition-all duration-300 transform translate-y-0 scale-100 ${
+      className={`fixed bottom-5 right-5 flex items-center p-4 rounded-xl border shadow-xl z-[9999] transition-all duration-300 transform translate-y-0 scale-100 ${
         type === "success"
           ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300"
           : "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/30 dark:border-rose-900/50 dark:text-rose-300"

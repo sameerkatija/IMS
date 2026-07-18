@@ -38,6 +38,7 @@ router.get('/req-auth', isAuthenticated, async (req, res) => {
 router.use('/auth', require('./auth-route'));
 
 router.use(isAuthenticated);
+router.use('/system', require('./system-route'));
 router.use('/user', require('./user-route'));
 router.use('/product', require('./product-route'));
 router.use('/product-category', require('./product-category-route'));

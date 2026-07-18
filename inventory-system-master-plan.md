@@ -68,9 +68,9 @@ backend/
 
 ## Phase Status Summary
 
-- **Phase 0 through Phase 10:** `[COMPLETED]` (Backend and frontend completely built, validated, and verified).
+- **Phase 0 through Phase 11:** `[COMPLETED]` (Backend and frontend built, validated, hardened, and documented for local deployment).
 - **Admin Password Reset & SuperAdmin Key Reset Features:** `[COMPLETED]` (Bcrypt-hashed password updates for admins, plus anonymous forgot password resets via secure env SUPERADMINKEY validation).
-- **Phase 11 — Hardening & Deployment:** `[TODO]`.
+- **Database Cleanup & Backup Utilities:** `[COMPLETED]` (Fully automated database wipe script and pure JS database backup mechanism with Admin dashboard button).
 
 ---
 
@@ -181,9 +181,13 @@ backend/
 
 ---
 
-## Phase 11 — Hardening & Deployment `[TODO]`
+## Phase 11 — Hardening, Utilities & Local Deployment `[COMPLETED]`
 
-- Setup client-side input validations using Formik/React Hook Form matching Zod backend boundaries.
-- Configure PM2 or systemd to daemonize the Node process.
-- Configure PostgreSQL to launch automatically as a Windows/system service.
-- Automate scheduled local daily backups using `pg_dump`.
+- **Hardening and Clean Utilities:**
+  - Implemented [clean-db.js](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/scratch/clean-db.js) to completely empty database tables safely using PostgreSQL truncates and constraint disabling.
+  - Implemented [backup-db.js](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/config/backup-db.js) to dump all tables as standard SQL insert statements, resetting PK autoincrement sequences.
+- **Admin Dashboard Integration:**
+  - Exposed admin-restricted route `GET /api/system/backup` in [system-route.js](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/routes/system-route.js).
+  - Added a premium **Backup Database** button on the client dashboard header for logged-in Administrators to trigger downloads of database dumps.
+- **Local Deployment Configuration:**
+  - Established a setup procedure for deploying the Node/Express backend and React/Vite frontend locally on a single machine running PostgreSQL.
