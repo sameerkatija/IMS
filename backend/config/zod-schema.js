@@ -366,6 +366,11 @@ exports.createPurchaseSchema = z.object({
       unitCost: z
         .coerce.number({ required_error: "Unit cost is required.", invalid_type_error: "Unit cost must be a number." })
         .nonnegative({ message: "Unit cost must be a non-negative number." }),
+      discount: z
+        .coerce.number({ invalid_type_error: "Discount must be a number." })
+        .nonnegative({ message: "Discount must be a non-negative number." })
+        .default(0)
+        .optional(),
     })
   ).nonempty({ message: "Purchase must contain at least one item." }),
 });
@@ -458,6 +463,11 @@ exports.createInvoiceSchema = z.object({
         .nonnegative({ message: "Unit price must be a non-negative number." })
         .optional()
         .nullable(),
+      discount: z
+        .coerce.number({ invalid_type_error: "Discount must be a number." })
+        .nonnegative({ message: "Discount must be a non-negative number." })
+        .default(0)
+        .optional(),
     })
   ).nonempty({ message: "Invoice must contain at least one item." }),
 });

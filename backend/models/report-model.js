@@ -41,6 +41,7 @@ async function getDashboardMetrics() {
     weekReturnsAgg,
     monthReturnsAgg,
     monthCashRefundAgg,
+    monthPurchaseDiscountAgg,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
@@ -111,12 +112,17 @@ async function getDashboardMetrics() {
         refundType: "CASH",
       },
     }),
+    prisma.purchase.aggregate({
+      _sum: { discount: true },
+      where: { purchaseDate: { gte: monthStart, lt: monthEnd } },
+    }),
   ]);
 
   const todaySalesReturn = Number(todayReturnsAgg._sum.totalAmount || 0);
   const weekSalesReturn = Number(weekReturnsAgg._sum.totalAmount || 0);
   const monthSalesReturn = Number(monthReturnsAgg._sum.totalAmount || 0);
   const monthCashRefund = Number(monthCashRefundAgg._sum.totalAmount || 0);
+  const monthPurchaseDiscount = Number(monthPurchaseDiscountAgg._sum.discount || 0);
 
   const todaySales = Math.max(0, Number(todaySalesAgg._sum.total || 0) - todaySalesReturn);
   const weekSales = Math.max(0, Number(weekSalesAgg._sum.total || 0) - weekSalesReturn);
@@ -151,7 +157,7 @@ async function getDashboardMetrics() {
 
   const monthCOGS = Number(monthCOGSRes[0]?.cogs || 0);
   const monthGrossProfit = monthSales - (monthCOGS - monthReturnedCOGS);
-  const monthNetProfit = monthGrossProfit - monthExpenses;
+  const monthNetProfit = monthGrossProfit - monthExpenses + monthPurchaseDiscount;
 
   // Resolve top products details with sales returns deducted and invoice discounts factored in
   const netRevenueMap = {};
@@ -200,6 +206,7 @@ async function getDashboardMetrics() {
     lowStockCount,
     topProducts,
     monthExpenses,
+    monthPurchaseDiscount,
     monthNetProfit,
   };
 }
@@ -563,7 +570,7 @@ async function netProfitReport(from, to) {
     }
   }
 
-  const [totalSalesAgg, cogsRes, expensesAgg] = await Promise.all([
+  const [totalSalesAgg, cogsRes, expensesAgg, purchaseDiscountsAgg] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
       where: { invoiceDate: { gte: fromDate, lte: toDate } },
@@ -580,17 +587,23 @@ async function netProfitReport(from, to) {
         expenseDate: { gte: fromDate, lte: toDate },
       },
     }),
+    prisma.purchase.aggregate({
+      _sum: { discount: true },
+      where: { purchaseDate: { gte: fromDate, lte: toDate } },
+    }),
   ]);
 
   const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
   const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
   const grossProfit = sales - cogs;
   const totalExpenses = Number(expensesAgg._sum.amount || 0);
-  const netProfit = grossProfit - totalExpenses;
+  const purchaseDiscounts = Number(purchaseDiscountsAgg._sum.discount || 0);
+  const netProfit = grossProfit - totalExpenses + purchaseDiscounts;
 
   return {
     grossProfit,
     totalExpenses,
+    purchaseDiscounts,
     netProfit,
   };
 }

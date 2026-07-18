@@ -65,7 +65,8 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
 
       // Default unitPrice to product's current sellingPrice if not overridden in payload
       const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : Number(product.sellingPrice);
-      const totalPrice = item.quantity * unitPrice;
+      const itemDiscount = Number(item.discount || 0);
+      const totalPrice = (item.quantity * unitPrice) - itemDiscount;
       subtotal += totalPrice;
       totalCost += item.quantity * Number(product.costPrice);
 

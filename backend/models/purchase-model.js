@@ -33,7 +33,8 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
         throw error;
       }
 
-      const totalCost = item.quantity * item.unitCost;
+      const itemDiscount = Number(item.discount || 0);
+      const totalCost = (item.quantity * item.unitCost) - itemDiscount;
       subtotal += totalCost;
 
       validatedItems.push({
@@ -230,6 +231,13 @@ function getPurchaseById(id) {
         },
       },
       supplier: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+        },
+      },
     },
   });
 }
