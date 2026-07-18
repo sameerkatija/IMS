@@ -21,6 +21,7 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
 
     // 2. Validate all products and calculate subtotal
     let subtotal = 0;
+    let totalItemDiscounts = 0;
     const validatedItems = [];
 
     for (const item of items) {
@@ -34,8 +35,9 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       }
 
       const itemDiscount = Number(item.discount || 0);
+      totalItemDiscounts += itemDiscount;
       const totalCost = (item.quantity * item.unitCost) - itemDiscount;
-      subtotal += totalCost;
+      subtotal += (item.quantity * item.unitCost);
 
       validatedItems.push({
         productId: item.productId,
@@ -46,7 +48,8 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
     }
 
     // 3. Compute final total
-    const total = subtotal - discount;
+    const finalDiscount = discount + totalItemDiscounts;
+    const total = subtotal - finalDiscount;
     if (total < 0) {
       const error = new Error("Total purchase amount cannot be negative.");
       error.statusCode = 400;
@@ -94,7 +97,7 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
         supplierId,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
         subtotal,
-        discount,
+        discount: finalDiscount,
         total,
         paidAmount,
         creditApplied,

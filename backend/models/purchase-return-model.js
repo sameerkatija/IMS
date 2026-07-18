@@ -65,13 +65,14 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
     const validatedItems = [];
 
     for (const item of items) {
-      const purchasedQty = purchasedQtyMap[item.productId];
-      if (purchasedQty === undefined) {
+      const pItem = purchase.items.find(pi => pi.productId === item.productId);
+      if (!pItem) {
         const error = new Error(`Product with ID ${item.productId} was not part of the original purchase.`);
         error.statusCode = 400;
         throw error;
       }
 
+      const purchasedQty = pItem.quantity;
       const alreadyReturned = alreadyReturnedQtyMap[item.productId] || 0;
       const remaining = purchasedQty - alreadyReturned;
 
@@ -83,13 +84,14 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
         throw error;
       }
 
-      const itemTotal = item.quantity * item.unitCost;
+      const netUnitCost = Number(pItem.totalCost) / purchasedQty;
+      const itemTotal = item.quantity * netUnitCost;
       totalAmount += itemTotal;
 
       validatedItems.push({
         productId: item.productId,
         quantity: item.quantity,
-        unitCost: item.unitCost,
+        unitCost: netUnitCost,
         totalCost: itemTotal,
       });
     }

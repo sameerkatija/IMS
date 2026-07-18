@@ -53,6 +53,7 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
     // 3. Loop and validate items, calculate subtotal, and snapshot cost prices at sale
     let subtotal = 0;
     let totalCost = 0;
+    let totalItemDiscounts = 0;
     const validatedItems = [];
 
     for (const item of items) {
@@ -66,8 +67,9 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       // Default unitPrice to product's current sellingPrice if not overridden in payload
       const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : Number(product.sellingPrice);
       const itemDiscount = Number(item.discount || 0);
+      totalItemDiscounts += itemDiscount;
       const totalPrice = (item.quantity * unitPrice) - itemDiscount;
-      subtotal += totalPrice;
+      subtotal += (item.quantity * unitPrice);
       totalCost += item.quantity * Number(product.costPrice);
 
       validatedItems.push({
@@ -80,7 +82,8 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
     }
 
     // 4. Calculate invoice totals and outstanding balance due
-    const total = subtotal - discount;
+    const finalDiscount = discount + totalItemDiscounts;
+    const total = subtotal - finalDiscount;
     if (total < totalCost) {
       const error = new Error(`Invoice discount is too high. Net total (Rs. ${total.toFixed(2)}) cannot go below the total cost price of the items (Rs. ${totalCost.toFixed(2)}).`);
       error.statusCode = 400;
@@ -133,7 +136,7 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         saleType,
         invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
         subtotal,
-        discount,
+        discount: finalDiscount,
         total,
         paidAmount,
         creditApplied,

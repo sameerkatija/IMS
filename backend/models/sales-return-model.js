@@ -57,13 +57,14 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
     const validatedItems = [];
 
     for (const item of items) {
-      const soldQty = soldQtyMap[item.productId];
-      if (soldQty === undefined) {
+      const invItem = invoice.items.find(ii => ii.productId === item.productId);
+      if (!invItem) {
         const error = new Error(`Product with ID ${item.productId} was not part of the original invoice.`);
         error.statusCode = 400;
         throw error;
       }
 
+      const soldQty = invItem.quantity;
       const alreadyReturned = alreadyReturnedQtyMap[item.productId] || 0;
       const remaining = soldQty - alreadyReturned;
 
@@ -75,15 +76,14 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         throw error;
       }
 
-      // Default unitPrice to original invoice's unitPrice or current sellingPrice
-      const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : unitPriceMap[item.productId];
-      const itemTotal = item.quantity * unitPrice;
+      const netUnitPrice = Number(invItem.totalPrice) / soldQty;
+      const itemTotal = item.quantity * netUnitPrice;
       totalAmount += itemTotal;
 
       validatedItems.push({
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice,
+        unitPrice: netUnitPrice,
         totalPrice: itemTotal,
       });
     }
