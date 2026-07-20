@@ -39,6 +39,7 @@ const Returns = () => {
   const [salesReturnReason, setSalesReturnReason] = useState("");
   const [salesReturnRefundType, setSalesReturnRefundType] = useState("CREDIT");
 
+
   // Tab 3: Purchase Returns (Supplier)
   const [purchaseReturns, setPurchaseReturns] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -47,6 +48,7 @@ const Returns = () => {
   const [loadedPurchase, setLoadedPurchase] = useState(null);
   const [purchaseReturnItems, setPurchaseReturnItems] = useState([]); // [{productId, name, sku, maxQty, quantity, unitCost}]
   const [purchaseReturnReason, setPurchaseReturnReason] = useState("");
+
 
   const fetchProducts = async () => {
     try {
@@ -227,7 +229,7 @@ const Returns = () => {
           sku: it.product.sku || "",
           maxQty: it.quantity,
           quantity: 0,
-          unitPrice: Number(it.unitPrice)
+          unitPrice: Number(it.totalPrice) / it.quantity
         })));
       }
     } catch (err) {
@@ -305,7 +307,7 @@ const Returns = () => {
           sku: it.product?.sku || "",
           maxQty: it.quantity,
           quantity: 0,
-          unitCost: Number(it.unitCost)
+          unitCost: Number(it.totalCost) / it.quantity
         })));
       }
     } catch (err) {
@@ -749,23 +751,27 @@ const Returns = () => {
                         />
                       </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Refund Method</label>
-                        <select
-                          value={salesReturnRefundType}
-                          onChange={(e) => setSalesReturnRefundType(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm font-semibold"
-                        >
-                          <option value="CREDIT">Store Credit (Ledger credit)</option>
-                          <option value="CASH">Cash Refund (Paid back immediately)</option>
-                        </select>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Refund Method</label>
+                          <select
+                            value={salesReturnRefundType}
+                            onChange={(e) => setSalesReturnRefundType(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm font-semibold"
+                          >
+                            <option value="CREDIT">Store Credit (Ledger credit)</option>
+                            <option value="CASH">Cash Refund (Paid back immediately)</option>
+                          </select>
+                        </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-center items-end text-right">
-                        <p className="text-xs text-slate-400 uppercase font-semibold">Total Credit Return</p>
-                        <p className="text-lg font-black text-rose-600 dark:text-rose-455">
-                          Rs. {formatCurrency(salesReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0))}
-                        </p>
+                      <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 space-y-1.5 text-right flex flex-col justify-center items-end">
+                        <div className="flex justify-between w-full max-w-[280px] pt-1">
+                          <span className="text-xs text-slate-400 uppercase font-bold">Net Refund:</span>
+                          <span className="text-base font-black text-emerald-600 dark:text-emerald-500">
+                            Rs. {formatCurrency(salesReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0))}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -952,14 +958,17 @@ const Returns = () => {
                           value={purchaseReturnReason}
                           onChange={(e) => setPurchaseReturnReason(e.target.value)}
                           placeholder="e.g. Expired stock returned, consignment defect"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm mb-4"
                         />
+
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-center items-end text-right">
-                        <p className="text-xs text-slate-400 uppercase font-semibold">Total Debit Return</p>
-                        <p className="text-lg font-black text-rose-600 dark:text-rose-455">
-                          Rs. {formatCurrency(purchaseReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitCost), 0))}
-                        </p>
+                      <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 space-y-1.5 text-right flex flex-col justify-center items-end">
+                        <div className="flex justify-between w-full max-w-[280px] pt-1">
+                          <span className="text-xs text-slate-400 uppercase font-bold">Net Refund:</span>
+                          <span className="text-base font-black text-emerald-600 dark:text-emerald-500">
+                            Rs. {formatCurrency(purchaseReturnItems.reduce((acc, curr) => acc + (curr.quantity * curr.unitCost), 0))}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

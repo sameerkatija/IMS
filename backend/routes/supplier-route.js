@@ -24,6 +24,9 @@ router.delete('/:id', supplierController.deactivateSupplier);
 //get supplier ledger history
 router.get('/:id/ledger', supplierController.getSupplierLedger);
 
+//reconcile supplier ledger
+router.get('/:id/reconcile', supplierController.reconcileSupplierLedger);
+
 module.exports = router;
 
 

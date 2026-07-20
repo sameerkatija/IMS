@@ -647,8 +647,14 @@ const Invoices = () => {
                       {invoices.map((inv) => (
                         <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
                           <td className="px-6 py-4 font-mono font-bold text-sky-600 dark:text-sky-400">
-                            {inv.invoiceNo}
+                            <div>{inv.invoiceNo}</div>
+                            {inv.salesReturns && inv.salesReturns.length > 0 && (
+                              <span className="inline-flex items-center mt-1.5 text-[9px] font-extrabold text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 px-1 rounded">
+                                RETURNED
+                              </span>
+                            )}
                           </td>
+
                           <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
                             <span className="flex items-center">
                               <Calendar size={12} className="mr-1.5" />
@@ -940,6 +946,12 @@ const Invoices = () => {
                         <span style={{ fontWeight: '600' }}>- PKR {formatCurrency(selectedInvoice.creditApplied)}</span>
                       </div>
                     )}
+                    {Number(selectedInvoice.returnedAmount) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#f43f5e' }}>
+                        <span>Returned Value:</span>
+                        <span style={{ fontWeight: '600' }}>- PKR {formatCurrency(selectedInvoice.returnedAmount)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
                       <span>Amount Received (Cash):</span>
                       <span style={{ fontWeight: '600' }}>PKR {formatCurrency(selectedInvoice.paidAmount)}</span>
@@ -947,11 +959,27 @@ const Invoices = () => {
                     {Number(selectedInvoice.balanceDue) > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
                         <span>Balance Due:</span>
+
                         <span>PKR {formatCurrency(selectedInvoice.balanceDue)}</span>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* ===== ASSOCIATED RETURNS ===== */}
+                {selectedInvoice.salesReturns && selectedInvoice.salesReturns.length > 0 && (
+                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-250" style={{ marginTop: '12px', paddingTop: '8px', fontSize: '11px' }}>
+                    <span className="font-bold text-rose-600 dark:text-rose-450 block mb-1">Associated Returns:</span>
+                    <div style={{ paddingLeft: '4px' }} className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                      {selectedInvoice.salesReturns.map((ret) => (
+                        <div key={ret.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{ret.returnNo}</span>
+                          <span className="font-bold">Rs. {formatCurrency(ret.totalAmount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* ===== FOOTER NOTES ===== */}
                 {selectedInvoice.description && (
@@ -959,6 +987,7 @@ const Invoices = () => {
                     Notes: {selectedInvoice.description}
                   </div>
                 )}
+
                 <div className="border-t border-dashed border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-400" style={{ textAlign: 'center', marginTop: '16px', fontSize: '10px', paddingTop: '8px' }}>
                   Thank you for your business! | Sameer Distributors | 03342320521
                 </div>

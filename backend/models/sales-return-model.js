@@ -105,16 +105,40 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
       },
     });
 
-    // 5. Create SalesReturnItems and run stock engine IN movements
     for (const item of validatedItems) {
+      const invItem = invoice.items.find(ii => ii.productId === item.productId);
+      const costPriceAtSale = invItem ? Number(invItem.costPriceAtSale) : 0;
+
       await tx.salesReturnItem.create({
         data: {
           salesReturnId: salesReturn.id,
           productId: item.productId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          costPriceAtSale,
           totalPrice: item.totalPrice,
         },
+      });
+
+      // Lock product row to prevent concurrency errors
+      const products = await tx.$queryRaw`
+        SELECT "stockQuantity", "weightedAvgCost" FROM "Product" 
+        WHERE id = ${item.productId} 
+        FOR UPDATE
+      `;
+      const current = products[0];
+      const existingQty = Number(current.stockQuantity);
+      const existingWAC = Number(current.weightedAvgCost);
+      const totalQty = existingQty + item.quantity;
+
+      const newWAC =
+        totalQty > 0
+          ? (existingQty * existingWAC + item.quantity * costPriceAtSale) / totalQty
+          : costPriceAtSale;
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { weightedAvgCost: Math.round(newWAC * 10000) / 10000 },
       });
 
       // Adjust stock (incrementing stock back in)
@@ -163,9 +187,43 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
       }
     }
 
+    // 7. Update invoice balanceDue and status to reflect the return.
+    //    Applies to ALL refund types (CREDIT store-credit and CASH payout):
+    //    - CREDIT: the credit note directly reduces what the customer owes on the invoice.
+    //    - CASH:   we pay the customer back in cash, which equally cancels that portion of
+    //              the receivable — the invoice should no longer show that debt.
+    //    If the return amount exceeds balanceDue (e.g., invoice was already paid in full),
+    //    the excess remains in Customer.balance as a negative (store credit) from the ledger
+    //    entry above — the invoice is left at PAID / balanceDue = 0 unchanged.
+    if (invoice.customerId && refundType === "CREDIT") {
+      const appliedToInvoice = Math.min(totalAmount, Number(invoice.balanceDue));
+      if (appliedToInvoice > 0) {
+        const newBalanceDue = Math.max(0, Number(invoice.balanceDue) - appliedToInvoice);
+        const newStatus =
+          newBalanceDue <= 0
+            ? "PAID"
+            : newBalanceDue < Number(invoice.total)
+            ? "PARTIALLY_PAID"
+            : "UNPAID";
+
+        await tx.invoice.update({
+          where: { id: invoiceId },
+          data: {
+            balanceDue: newBalanceDue,
+            status: newStatus,
+            returnedAmount: { increment: appliedToInvoice }
+          },
+        });
+      }
+      // appliedToInvoice === 0 means invoice was already fully paid.
+      // The ledger entries already handle the excess credit/cash obligation correctly.
+    }
+
     return salesReturn;
+
   });
 }
+
 
 /**
  * Returns all sales returns matching filters, ordered by creation desc.

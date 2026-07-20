@@ -67,7 +67,9 @@ All endpoints support standard listings with pagination (`?page=1&limit=10`), te
 * `/api/product` - Product listings, creations, SKU/barcode lookups, and inventory status flags.
 * `/api/product-category` - Product categories.
 * `/api/customer` - Customer registrations, status toggles, and balance reconciliations.
+* `GET /api/customer/:id/reconcile` - Reconciles customer ledger running balance, denormalized balance, duplicates, and broken references.
 * `/api/supplier` - Supplier records.
+* `GET /api/supplier/:id/reconcile` - Reconciles supplier ledger running balance, denormalized balance, duplicates, and broken references.
 * `/api/salesman` - Salesman directories (login-less records tagged on Invoices).
 * `/api/expense-category` - Categorized expense targets (Utilities, wages, transport, etc.).
 
@@ -82,7 +84,8 @@ All endpoints support standard listings with pagination (`?page=1&limit=10`), te
 * `POST /api/sales-return` - Registers customer returns, increments stock, and credits ledger values.
 
 ### Payments & Settlements (Phase 7)
-* `POST /api/payment/customer` - Logs customer account payments (supports paying specific invoices or general overall balance). Overpayments are blocked.
+* `POST /api/payment/customer` - Logs customer account payments (supports general unallocated payments or multi-invoice allocations). Overpayments are blocked.
+* `POST /api/payment/customer/allocate` - Allocates general payment balances (advance credits) to outstanding customer invoices post-creation. Enforces thread-safe row-level locking (`FOR UPDATE`) on the payment record and atomic conditional updates (`updateMany`) on target invoices.
 * `POST /api/payment/supplier` - Logs supplier payments.
 * `GET /api/payment/customer` & `GET /api/payment/supplier` - Returns payment records.
 

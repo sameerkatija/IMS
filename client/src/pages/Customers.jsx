@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { Users, Plus, Edit2, Search, FileText, Phone, MapPin } from "lucide-react";
+import { Users, Plus, Edit2, Search, FileText, Phone, MapPin, ShieldCheck } from "lucide-react";
 import Toast from "../components/Toast";
 
 const Customers = () => {
@@ -26,6 +26,11 @@ const Customers = () => {
     phone: "",
     address: ""
   });
+
+  // Reconciliation modal state
+  const [reconcileData, setReconcileData] = useState(null);
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+  const [reconcileLoading, setReconcileLoading] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -137,6 +142,22 @@ const Customers = () => {
     } catch (err) {
       console.error(err);
       setToast({ message: "Failed to update customer status.", type: "error" });
+    }
+  };
+
+  const handleReconcile = async (customer) => {
+    try {
+      setReconcileLoading(true);
+      const response = await api.get(`/api/customer/${customer.id}/reconcile`);
+      if (response.data && response.data.type === "success") {
+        setReconcileData(response.data.data);
+        setIsReconcileModalOpen(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setToast({ message: "Failed to reconcile customer ledger.", type: "error" });
+    } finally {
+      setReconcileLoading(false);
     }
   };
 
@@ -266,8 +287,16 @@ const Customers = () => {
                         <button
                           onClick={() => openModal(c)}
                           className="inline-flex items-center p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="Edit Customer"
                         >
                           <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleReconcile(c)}
+                          disabled={reconcileLoading}
+                          className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-450 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg border border-amber-200 dark:border-amber-900/40 disabled:opacity-50 transition-colors"
+                        >
+                          <ShieldCheck size={12} className="mr-1" /> Reconcile
                         </button>
                         <button
                           onClick={() => navigate(`/reports?tab=customer-ledger&customerId=${c.id}`)}
@@ -383,6 +412,96 @@ const Customers = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reconciliation Modal */}
+      {isReconcileModalOpen && reconcileData && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="text-amber-600" size={20} />
+                  Ledger Reconciliation Audit
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Account details and transaction verification for <strong>{reconcileData.customerName}</strong>.
+                </p>
+              </div>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                reconcileData.inSync
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-450 border border-emerald-200 dark:border-emerald-900/40"
+                  : "bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-450 border border-rose-200 dark:border-rose-900/40"
+              }`}>
+                {reconcileData.inSync ? "In Sync" : "Drift Detected"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 border border-slate-200 dark:border-slate-800 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40">
+              <div className="text-center">
+                <span className="text-xs text-slate-400 block">DB Balance</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Rs. {Number(reconcileData.denormalizedBalance).toFixed(2)}</span>
+              </div>
+              <div className="text-center border-x border-slate-200 dark:border-slate-850">
+                <span className="text-xs text-slate-400 block">Ledger Sum</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Rs. {Number(reconcileData.ledgerSum).toFixed(2)}</span>
+              </div>
+              <div className="text-center">
+                <span className="text-xs text-slate-400 block">Drift Balance</span>
+                <span className={`text-sm font-bold ${Number(reconcileData.drift) !== 0 ? "text-rose-600 font-black" : "text-slate-900 dark:text-white"}`}>
+                  Rs. {Number(reconcileData.drift).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {reconcileData.duplicateEntriesCount > 0 && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex flex-col gap-1">
+                <strong>Potential Duplicates Found:</strong>
+                <span>There are {reconcileData.duplicateEntriesCount} transaction logs that share identical amounts and timestamps. Check the ledger history sheet manually.</span>
+              </div>
+            )}
+
+            {reconcileData.invalidReferences.length > 0 ? (
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-rose-600 block">Broken Linkages / Broken Records:</span>
+                <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold">
+                        <th className="p-2">Type</th>
+                        <th className="p-2">ID</th>
+                        <th className="p-2">Error Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {reconcileData.invalidReferences.map((ref, idx) => (
+                        <tr key={idx} className="text-slate-500">
+                          <td className="p-2 font-mono">{ref.type}</td>
+                          <td className="p-2 font-mono">#{ref.id}</td>
+                          <td className="p-2 text-rose-600">{ref.error}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-2 text-xs text-slate-400">
+                ✓ No broken document references or ledger links detected.
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => { setIsReconcileModalOpen(false); setReconcileData(null); }}
+                className="px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Close Audit
+              </button>
+            </div>
           </div>
         </div>
       )}

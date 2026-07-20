@@ -138,7 +138,8 @@ backend/
 
 ## Phase 7 — Payments `[COMPLETED]`
 
-- **Customer Payments:** Records payments, updates invoice paid statistics, sets states (`PAID`, `PARTIALLY_PAID`), and writes credits to the customer ledger. Overpayments beyond outstanding balances are rejected.
+- **Customer Payments:** Records payments (supporting general unallocated payments or multi-invoice allocations), updates invoice paid statistics via `PaymentAllocation` records, and updates invoice states (`PAID`, `PARTIALLY_PAID`). Overpayments beyond outstanding customer balances are rejected.
+- **Customer Payment Allocation:** Exposes a service post-creation to allocate general payment balances (advance credits) to outstanding customer invoices with thread-safe atomic over-allocation guards and upsert increment logic.
 - **Supplier Payments:** Records settlements and logs debits to the supplier ledger to reduce outstanding balances.
 
 ---

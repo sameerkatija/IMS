@@ -9,42 +9,31 @@ const { generateDocNumber } = require("../config/doc-number");
  */
 async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmount = 0, creditApplied = 0, description, items, createdById }) {
   return prisma.$transaction(async (tx) => {
-    // 1. Verify supplier exists
-    const supplier = await tx.supplier.findUnique({
-      where: { id: supplierId },
-    });
+    // 1. Verify supplier exists and lock the row
+    const suppliers = await tx.$queryRaw`
+      SELECT * FROM "Supplier" 
+      WHERE id = ${supplierId} 
+      FOR UPDATE
+    `;
+    const supplier = suppliers[0];
     if (!supplier) {
       const error = new Error("Supplier not found.");
       error.statusCode = 404;
       throw error;
     }
+    if (!supplier.isActive) {
+      const error = new Error("Supplier is inactive.");
+      error.statusCode = 400;
+      throw error;
+    }
 
-    // 2. Validate all products and calculate subtotal
+
+    // 2. Validate all products and calculate subtotal and item discounts
     let subtotal = 0;
     let totalItemDiscounts = 0;
-    const validatedItems = [];
-
     for (const item of items) {
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
-      });
-      if (!product) {
-        const error = new Error(`Product with ID ${item.productId} not found.`);
-        error.statusCode = 404;
-        throw error;
-      }
-
-      const itemDiscount = Number(item.discount || 0);
-      totalItemDiscounts += itemDiscount;
-      const totalCost = (item.quantity * item.unitCost) - itemDiscount;
       subtotal += (item.quantity * item.unitCost);
-
-      validatedItems.push({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitCost: item.unitCost,
-        totalCost,
-      });
+      totalItemDiscounts += Number(item.discount || 0);
     }
 
     // 3. Compute final total
@@ -84,6 +73,43 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       }
     }
 
+    const validatedItems = [];
+    for (const item of items) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId },
+      });
+      if (!product) {
+        const error = new Error(`Product with ID ${item.productId} not found.`);
+        error.statusCode = 404;
+        throw error;
+      }
+      if (!product.isActive) {
+        const error = new Error(`Product with ID ${item.productId} is inactive.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+
+      const itemDiscount = Number(item.discount || 0);
+      const itemSubtotal = item.quantity * item.unitCost;
+
+      let proportionalDiscountShare = 0;
+      if (subtotal > 0 && discount > 0) {
+        proportionalDiscountShare = (itemSubtotal / subtotal) * discount;
+      }
+
+      const itemTotalCost = Math.round((itemSubtotal - itemDiscount - proportionalDiscountShare) * 100) / 100;
+      const netUnitCost = Math.round((itemTotalCost / item.quantity) * 100) / 100;
+
+      validatedItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        totalCost: itemTotalCost,
+        netUnitCost,
+      });
+    }
+
     const balanceDue = total - paidAmount - creditApplied;
     const status = (paidAmount + creditApplied) >= total ? "PAID" : ((paidAmount + creditApplied) > 0 ? "PARTIALLY_PAID" : "UNPAID");
 
@@ -108,7 +134,7 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       },
     });
 
-    // 6. Create PurchaseItems and run stock engine IN movements
+    // 6. Create PurchaseItems, compute WAC, and run stock engine IN movements
     for (const item of validatedItems) {
       await tx.purchaseItem.create({
         data: {
@@ -118,6 +144,29 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
           unitCost: item.unitCost,
           totalCost: item.totalCost,
         },
+      });
+
+      // Compute new Weighted Average Cost BEFORE adjustStock increments stockQuantity.
+      // WAC formula: (existingQty * currentWAC + purchasedQty * netUnitCost) / (existingQty + purchasedQty)
+      // NOTE: costPrice is intentionally NOT touched — it is a user-managed reference field.
+      // Lock the product row to prevent concurrency errors
+      const products = await tx.$queryRaw`
+        SELECT "stockQuantity", "weightedAvgCost" FROM "Product" 
+        WHERE id = ${item.productId} 
+        FOR UPDATE
+      `;
+      const current = products[0];
+      const existingQty = Number(current.stockQuantity);
+      const existingWAC = Number(current.weightedAvgCost);
+      const totalQty = existingQty + item.quantity;
+      const newWAC =
+        totalQty > 0
+          ? (existingQty * existingWAC + item.quantity * item.netUnitCost) / totalQty
+          : item.netUnitCost;
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { weightedAvgCost: Math.round(newWAC * 10000) / 10000 },
       });
 
       // Adjust stock (incrementing)
@@ -136,8 +185,9 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
     }
 
     // 7. If paidAmount > 0, log supplier payment
+    let upfrontPayment = null;
     if (paidAmount > 0) {
-      await tx.supplierPayment.create({
+      upfrontPayment = await tx.supplierPayment.create({
         data: {
           supplierId,
           purchaseId: purchase.id,
@@ -171,13 +221,14 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
           supplierId,
           credit: 0,
           debit: paidAmount,
-          referenceType: "PURCHASE",
-          referenceId: purchase.id,
+          referenceType: "PAYMENT",
+          referenceId: upfrontPayment ? upfrontPayment.id : purchase.id,
           description: `Payment for Purchase ${purchaseNo}`,
         },
         tx
       );
     }
+
 
     return purchase;
   });
@@ -199,7 +250,15 @@ function getAllPurchases({ where, skip, take }) {
           items: true,
         },
       },
+      returns: {
+        select: {
+          id: true,
+          returnNo: true,
+          totalAmount: true,
+        },
+      },
     },
+
     orderBy: {
       createdAt: "desc",
     },
@@ -241,9 +300,25 @@ function getPurchaseById(id) {
           role: true,
         },
       },
+      returns: {
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                }
+              }
+            }
+          }
+        }
+      },
     },
   });
 }
+
 
 module.exports = {
   createPurchase,

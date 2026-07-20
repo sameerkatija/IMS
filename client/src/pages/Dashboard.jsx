@@ -172,7 +172,7 @@ const Dashboard = () => {
     {
       title: "Monthly Net Profit",
       value: `Rs. ${metrics.monthNetProfit.toLocaleString()}`,
-      description: "Profit after COGS, Expenses & Purchase Discounts",
+      description: "Profit after COGS & Expenses",
       icon: DollarSign,
       color: metrics.monthNetProfit >= 0 ? "text-sky-600" : "text-rose-600",
       bg: metrics.monthNetProfit >= 0 ? "bg-sky-500/10" : "bg-rose-500/10",

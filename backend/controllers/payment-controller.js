@@ -5,12 +5,13 @@ const paymentModel = require("../models/payment-model");
  */
 async function recordCustomerPayment(req, res) {
   try {
-    const { customerId, invoiceId, amount, isCreditApplied, paymentDate, description } = req.body;
+    const { customerId, invoiceId, allocations, amount, isCreditApplied, paymentDate, description } = req.body;
     const createdById = req.user.id;
 
     const payment = await paymentModel.recordCustomerPayment({
       customerId,
       invoiceId,
+      allocations,
       amount,
       isCreditApplied,
       paymentDate,
@@ -28,6 +29,78 @@ async function recordCustomerPayment(req, res) {
     return res.status(err.statusCode || 500).json({
       type: "error",
       message: err.message || "Failed to record customer payment.",
+    });
+  }
+}
+
+/**
+ * Refunds a customer's existing store-credit balance as cash.
+ * POST /api/payment/customer/refund-credit
+ * Body: { customerId, amount, refundDate?, description? }
+ */
+async function refundCustomerCredit(req, res) {
+  try {
+    const { customerId, amount, refundDate, description } = req.body;
+    const createdById = req.user.id;
+
+    if (!customerId || !amount) {
+      return res.status(400).json({
+        type: "error",
+        message: "customerId and amount are required.",
+      });
+    }
+
+    const payment = await paymentModel.refundCustomerCreditBalance({
+      customerId: Number(customerId),
+      amount: Number(amount),
+      refundDate,
+      description,
+      createdById,
+    });
+
+    return res.status(201).json({
+      type: "success",
+      message: "Store credit refunded to customer as cash successfully.",
+      data: payment,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({
+      type: "error",
+      message: err.message || "Failed to refund customer credit.",
+    });
+  }
+}
+
+/**
+ * Handles allocating an existing customer payment to invoices post-creation.
+ */
+async function allocateCustomerPayment(req, res) {
+  try {
+    const { customerPaymentId, allocations } = req.body;
+
+    if (!customerPaymentId || !allocations || !Array.isArray(allocations)) {
+      return res.status(400).json({
+        type: "error",
+        message: "customerPaymentId and allocations array are required.",
+      });
+    }
+
+    const results = await paymentModel.allocateCustomerPayment({
+      customerPaymentId: Number(customerPaymentId),
+      allocations,
+    });
+
+    return res.status(200).json({
+      type: "success",
+      message: "Payment allocated successfully",
+      data: results,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({
+      type: "error",
+      message: err.message || "Failed to allocate customer payment.",
     });
   }
 }
@@ -170,6 +243,8 @@ async function listSupplierPayments(req, res) {
 
 module.exports = {
   recordCustomerPayment,
+  refundCustomerCredit,
+  allocateCustomerPayment,
   listCustomerPayments,
   recordSupplierPayment,
   listSupplierPayments,

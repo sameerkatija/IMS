@@ -12,10 +12,20 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
   return prisma.$transaction(async (tx) => {
     // 1. Validate customer exists (if customerId is provided) and check credit limits
     if (customerId) {
-      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      const customers = await tx.$queryRaw`
+        SELECT * FROM "Customer" 
+        WHERE id = ${customerId} 
+        FOR UPDATE
+      `;
+      const customer = customers[0];
       if (!customer) {
         const error = new Error("Customer not found.");
         error.statusCode = 404;
+        throw error;
+      }
+      if (!customer.isActive) {
+        const error = new Error("Customer is inactive.");
+        error.statusCode = 400;
         throw error;
       }
 
@@ -50,11 +60,11 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       }
     }
 
-    // 3. Loop and validate items, calculate subtotal, and snapshot cost prices at sale
+    // 3. Loop and validate items, calculate subtotal and item discounts first
     let subtotal = 0;
     let totalCost = 0;
     let totalItemDiscounts = 0;
-    const validatedItems = [];
+    const productsMap = {};
 
     for (const item of items) {
       const product = await tx.product.findUnique({ where: { id: item.productId } });
@@ -63,22 +73,19 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         error.statusCode = 404;
         throw error;
       }
+      if (!product.isActive) {
+        const error = new Error(`Product with ID ${item.productId} is inactive.`);
+        error.statusCode = 400;
+        throw error;
+      }
+      productsMap[item.productId] = product;
 
-      // Default unitPrice to product's current sellingPrice if not overridden in payload
+
       const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : Number(product.sellingPrice);
-      const itemDiscount = Number(item.discount || 0);
-      totalItemDiscounts += itemDiscount;
-      const totalPrice = (item.quantity * unitPrice) - itemDiscount;
       subtotal += (item.quantity * unitPrice);
-      totalCost += item.quantity * Number(product.costPrice);
-
-      validatedItems.push({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice,
-        costPriceAtSale: Number(product.costPrice),
-        totalPrice,
-      });
+      totalItemDiscounts += Number(item.discount || 0);
+      // Use weightedAvgCost (actual blended cost paid) — NOT costPrice (user reference)
+      totalCost += item.quantity * Number(product.weightedAvgCost);
     }
 
     // 4. Calculate invoice totals and outstanding balance due
@@ -108,6 +115,31 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       throw error;
     }
 
+    const validatedItems = [];
+    for (const item of items) {
+      const product = productsMap[item.productId];
+      const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : Number(product.sellingPrice);
+      const itemDiscount = Number(item.discount || 0);
+      const itemSubtotal = item.quantity * unitPrice;
+
+      let proportionalDiscountShare = 0;
+      if (subtotal > 0 && discount > 0) {
+        proportionalDiscountShare = (itemSubtotal / subtotal) * discount;
+      }
+
+      const itemTotalPrice = Math.round((itemSubtotal - itemDiscount - proportionalDiscountShare) * 100) / 100;
+
+      validatedItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice,
+        // Snapshot the WAC at time of sale — this is the historical COGS for this line item.
+        // weightedAvgCost reflects the actual blended discounted cost in inventory, not the user reference price.
+        costPriceAtSale: Number(product.weightedAvgCost),
+        totalPrice: itemTotalPrice,
+      });
+    }
+
     const balanceDue = total - paidAmount - creditApplied;
 
     // Enforce business rules & constraints
@@ -119,6 +151,12 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
 
     if (balanceDue > 0 && !customerId) {
       const error = new Error("Customer is required when there is an outstanding balance due.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (saleType === "CASH" && balanceDue > 0) {
+      const error = new Error("Cash sales must be paid in full.");
       error.statusCode = 400;
       throw error;
     }
@@ -176,18 +214,27 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
     }
 
     // 8. If paidAmount > 0 and customer is present, log counter Payment
+    let upfrontPayment = null;
     if (paidAmount > 0 && customerId) {
-      await tx.customerPayment.create({
+      upfrontPayment = await tx.customerPayment.create({
         data: {
           customerId,
-          invoiceId: invoice.id,
           amount: paidAmount,
           paymentDate: invoice.invoiceDate,
           description: `Cash paid upfront for Invoice ${invoiceNo}`,
           createdById,
+          allocations: {
+            create: [
+              {
+                invoiceId: invoice.id,
+                amountAllocated: paidAmount,
+              }
+            ]
+          }
         },
       });
     }
+
 
     // 9. Post ledger entries (only for credit sales or when store credit is applied)
     if (customerId && (saleType === "CREDIT" || creditApplied > 0)) {
@@ -212,14 +259,34 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
             customerId,
             debit: 0,
             credit: paidAmount,
-            referenceType: "INVOICE",
-            referenceId: invoice.id,
+            referenceType: "PAYMENT",
+            referenceId: upfrontPayment ? upfrontPayment.id : invoice.id,
             description: `Cash payment upfront for Invoice ${invoiceNo}`,
           },
           tx
         );
       }
+
+      // When store credit (negative customer balance) is applied toward this invoice,
+      // post a CREDIT entry to consume that credit from the ledger.
+      // Without this, customer.balance remains overstated relative to invoice.balanceDue
+      // by exactly the creditApplied amount — a permanent accounting drift.
+      if (creditApplied > 0) {
+        await ledgerModel.recordCustomerLedgerEntry(
+          {
+            customerId,
+            debit: 0,
+            credit: creditApplied,
+            referenceType: "INVOICE",
+            referenceId: invoice.id,
+            description: `Store credit applied for Invoice ${invoiceNo}`,
+          },
+          tx
+        );
+      }
     }
+
+
 
     return invoice;
   });
@@ -257,7 +324,15 @@ function getAllInvoices({ where, skip, take }) {
           items: true,
         },
       },
+      salesReturns: {
+        select: {
+          id: true,
+          returnNo: true,
+          totalAmount: true,
+        },
+      },
     },
+
     orderBy: {
       createdAt: "desc",
     },
@@ -293,9 +368,25 @@ function getInvoiceById(id) {
       },
       customer: true,
       salesman: true,
+      salesReturns: {
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                }
+              }
+            }
+          }
+        }
+      },
     },
   });
 }
+
 
 module.exports = {
   createInvoice,

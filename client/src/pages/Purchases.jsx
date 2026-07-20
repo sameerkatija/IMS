@@ -25,6 +25,8 @@ const Purchases = () => {
   const [creditApplied, setCreditApplied] = useState("0");
   const [description, setDescription] = useState("");
   const [items, setItems] = useState([{ productId: "", quantity: "", unitCost: "", discount: "0" }]);
+  const [searchQueries, setSearchQueries] = useState([""]);
+  const [openDropdownIndex, setOpenDropdownIndex] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Detail view state
@@ -70,11 +72,14 @@ const Purchases = () => {
 
   const addItemRow = () => {
     setItems([...items, { productId: "", quantity: "", unitCost: "", discount: "0" }]);
+    setSearchQueries([...searchQueries, ""]);
   };
 
   const removeItemRow = (index) => {
     if (items.length === 1) return;
     setItems(items.filter((_, idx) => idx !== index));
+    setSearchQueries(searchQueries.filter((_, idx) => idx !== index));
+    if (openDropdownIndex === index) setOpenDropdownIndex(null);
   };
 
   const handleItemChange = (index, field, value) => {
@@ -169,7 +174,9 @@ const Purchases = () => {
         setPaidAmount("0");
         setCreditApplied("0");
         setDescription("");
-        setItems([{ productId: "", quantity: "", unitCost: "" }]);
+        setItems([{ productId: "", quantity: "", unitCost: "", discount: "0" }]);
+        setSearchQueries([""]);
+        setOpenDropdownIndex(null);
         setIsFormOpen(false);
       }
     } catch (err) {
@@ -282,21 +289,77 @@ const Purchases = () => {
               <div className="space-y-3">
                 {items.map((item, index) => (
                   <div key={index} className="flex flex-col md:flex-row md:items-end gap-3 bg-slate-50/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/50 relative">
-                    <div className="flex-1">
+                    <div className="flex-1 relative">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Product *</label>
-                      <select
-                        required
-                        value={item.productId}
-                        onChange={(e) => handleItemChange(index, "productId", e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                      >
-                        <option value="">Search Product...</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}{p.size ? ` (${p.size})` : ""}{p.sku ? ` [${p.sku}]` : ""}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Type to search product..."
+                          value={searchQueries[index] || ""}
+                          onFocus={() => setOpenDropdownIndex(index)}
+                          onChange={(e) => {
+                            const query = e.target.value;
+                            const nextQueries = [...searchQueries];
+                            nextQueries[index] = query;
+                            setSearchQueries(nextQueries);
+                            setOpenDropdownIndex(index);
+                            
+                            // If user clears input, clear selection
+                            if (!query.trim()) {
+                              handleItemChange(index, "productId", "");
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                        />
+                        
+                        {/* Custom Dropdown List */}
+                        {openDropdownIndex === index && (
+                          <>
+                            {/* Backdrop click to close */}
+                            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
+                            
+                            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-20 divide-y divide-slate-100 dark:divide-slate-800">
+                              {(() => {
+                                const q = (searchQueries[index] || "").toLowerCase().trim();
+                                const filtered = products.filter(p => 
+                                  p.name.toLowerCase().includes(q) || 
+                                  (p.sku && p.sku.toLowerCase().includes(q)) ||
+                                  (p.barcode && p.barcode.toLowerCase().includes(q))
+                                );
+                                
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-3 py-2 text-xs text-slate-450 italic">
+                                      No products found
+                                    </div>
+                                  );
+                                }
+                                
+                                return filtered.map((p) => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => {
+                                      handleItemChange(index, "productId", p.id.toString());
+                                      const nextQueries = [...searchQueries];
+                                      nextQueries[index] = `${p.name}${p.size ? ` (${p.size})` : ""}${p.sku ? ` [${p.sku}]` : ""}`;
+                                      setSearchQueries(nextQueries);
+                                      setOpenDropdownIndex(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-350 transition-colors"
+                                  >
+                                    <span className="font-semibold block">{p.name}</span>
+                                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                                      {p.size ? `Size: ${p.size}` : ""}{p.sku ? ` | SKU: ${p.sku}` : ""}{p.barcode ? ` | Barcode: ${p.barcode}` : ""}
+                                    </span>
+                                  </button>
+                                ));
+                              })()}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     <div className="w-full md:w-32">
@@ -522,8 +585,14 @@ const Purchases = () => {
                       {purchases.map((purchase) => (
                         <tr key={purchase.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
                           <td className="px-6 py-4 font-mono font-bold text-sky-600 dark:text-sky-400">
-                            {purchase.purchaseNo}
+                            <div>{purchase.purchaseNo}</div>
+                            {purchase.returns && purchase.returns.length > 0 && (
+                              <span className="inline-flex items-center mt-1.5 text-[9px] font-extrabold text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 px-1 rounded">
+                                RETURNED
+                              </span>
+                            )}
                           </td>
+
                           <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
                             <span className="flex items-center">
                               <Calendar size={12} className="mr-1.5" />
@@ -702,6 +771,12 @@ const Purchases = () => {
                       <span style={{ fontWeight: '600' }}>PKR {formatCurrency(selectedPurchase.creditApplied)}</span>
                     </div>
                   )}
+                  {Number(selectedPurchase.returnedAmount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#f43f5e' }}>
+                      <span>Returned Value:</span>
+                      <span style={{ fontWeight: '600' }}>- PKR {formatCurrency(selectedPurchase.returnedAmount)}</span>
+                    </div>
+                  )}
                   {Number(selectedPurchase.balanceDue) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#dc2626', fontWeight: '700' }}>
                       <span>Balance Due:</span>
@@ -711,11 +786,28 @@ const Purchases = () => {
                 </div>
               </div>
 
-              {selectedPurchase.description && (
-                <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
-                  Notes: {selectedPurchase.description}
-                </div>
-              )}
+                {/* ===== ASSOCIATED RETURNS ===== */}
+                {selectedPurchase.returns && selectedPurchase.returns.length > 0 && (
+                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-250" style={{ marginTop: '12px', paddingTop: '8px', fontSize: '11px' }}>
+                    <span className="font-bold text-rose-600 dark:text-rose-450 block mb-1">Associated Returns:</span>
+                    <div style={{ paddingLeft: '4px' }} className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                      {selectedPurchase.returns.map((ret) => (
+                        <div key={ret.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{ret.returnNo}</span>
+                          <span className="font-bold">Rs. {formatCurrency(ret.totalAmount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ===== FOOTER NOTES ===== */}
+                {selectedPurchase.description && (
+                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
+                    Notes: {selectedPurchase.description}
+                  </div>
+                )}
+
             </div>
           </div>
         </div>

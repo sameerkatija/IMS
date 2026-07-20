@@ -1,4 +1,5 @@
 const supplier = require("../models/supplier-model");
+const ledgerModel = require("../models/ledger-model");
 
 const getAllSuppliers = async (req, res) => {
     try {
@@ -101,7 +102,9 @@ const getSupplierById = async (req, res) => {
 };
 const updateSupplier = async (req, res) => {
     try {
-        const data = await supplier.updateSupplier(req.params.id, req.body);
+        const updateData = { ...req.body };
+        delete updateData.balance;
+        const data = await supplier.updateSupplier(req.params.id, updateData);
         res.json({
             type: 'success',
             message: 'Supplier updated successfully',
@@ -190,6 +193,20 @@ const getSupplierLedger = async (req, res) => {
     }
 };
 
+const reconcileSupplierLedger = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ type: "error", message: "Invalid supplier ID" });
+        }
+        const result = await ledgerModel.reconcileSupplierLedger(id);
+        res.json({ type: "success", data: result });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ type: "error", message: err.message || "Failed to reconcile supplier ledger" });
+    }
+};
+
 module.exports = {
     getAllSuppliers,
     createSupplier,
@@ -197,5 +214,6 @@ module.exports = {
     updateSupplier,
     deactivateSupplier,
     activateSupplier,
-    getSupplierLedger
-}
+    getSupplierLedger,
+    reconcileSupplierLedger
+};

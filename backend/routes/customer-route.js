@@ -24,6 +24,9 @@ router.delete('/:id', customerController.deactivateCustomer);
 //get customer ledger history
 router.get('/:id/ledger', customerController.getCustomerLedger);
 
+//reconcile customer ledger
+router.get('/:id/reconcile', customerController.reconcileCustomerLedger);
+
 module.exports = router;
 
 

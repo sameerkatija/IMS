@@ -4,15 +4,14 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider     = "prisma-client-js"
+  output       = "../generated/prisma"
   moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
 }
-
 
 // ================================================================
 // ENUMS
@@ -27,8 +26,8 @@ enum Role {
 // this enum tells you whether it added to, removed from, or
 // corrected the stock count.
 enum MovementType {
-  IN         // stock increased (purchase, sales return)
-  OUT        // stock decreased (sale, purchase return)
+  IN // stock increased (purchase, sales return)
+  OUT // stock decreased (sale, purchase return)
 }
 
 // What caused a StockMovement or ledger entry. Paired with
@@ -40,6 +39,7 @@ enum ReferenceType {
   SALES_RETURN
   PURCHASE_RETURN
   ADJUSTMENT
+  PAYMENT
 }
 
 // Whether a sale was paid in full at the counter (CASH) or is
@@ -58,22 +58,21 @@ enum InvoiceStatus {
   PAID
 }
 
-
 // ================================================================
 // USERS
 // ================================================================
 
 model User {
-  id           Int       @id @default(autoincrement())
-  name         String
-  username     String    @unique
-  email        String?   @unique
-  password     String
-  role         Role      @default(STAFF)
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  name        String
+  username    String    @unique
+  email       String?   @unique
+  password    String
+  role        Role      @default(STAFF)
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   createdInvoices         Invoice[]
   createdPurchases        Purchase[]
@@ -95,12 +94,12 @@ model User {
 // buy from (Supplier).
 
 model Category {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  products Product[]
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 }
 
 model Product {
@@ -108,10 +107,16 @@ model Product {
   name         String
   barcode      String? @unique // optional; not every product is barcoded
   sku          String? @unique // optional internal code (complementary)
-  size         String?         // optional product size (e.g. "Size M", "Size L")
+  size         String? // optional product size (e.g. "Size M", "Size L")
   categoryId   Int
-  costPrice    Decimal @db.Decimal(12, 2) // what you pay per piece
+  costPrice    Decimal @db.Decimal(12, 2) // user-visible reference price; NEVER auto-changed by the system
   sellingPrice Decimal @db.Decimal(12, 2) // what you charge per piece
+
+  // System-managed Weighted Average Cost. Updated atomically on every purchase
+  // using the WAC blending formula: (existingQty * oldWAC + newQty * netUnitCost) / (existingQty + newQty).
+  // This is the value used for COGS snapshots (InvoiceItem.costPriceAtSale) and
+  // inventory asset valuation — NOT costPrice.
+  weightedAvgCost Decimal @default(0) @db.Decimal(12, 4)
 
   // stockQuantity is a DENORMALIZED SNAPSHOT, always in pieces.
   // It should always equal the sum of all StockMovement rows for
@@ -135,12 +140,12 @@ model Product {
   updatedAt DateTime @updatedAt
 
   category            Category             @relation(fields: [categoryId], references: [id])
-  stockMovements      StockMovement[]      // full audit trail of every stock change
-  purchaseItems       PurchaseItem[]       // every time this was bought in
-  invoiceItems        InvoiceItem[]        // every time this was sold out
-  salesReturnItems    SalesReturnItem[]    // every time a customer returned this
+  stockMovements      StockMovement[] // full audit trail of every stock change
+  purchaseItems       PurchaseItem[] // every time this was bought in
+  invoiceItems        InvoiceItem[] // every time this was sold out
+  salesReturnItems    SalesReturnItem[] // every time a customer returned this
   purchaseReturnItems PurchaseReturnItem[] // every time you returned this to a supplier
-  stockAdjustments    StockAdjustment[]    // every manual correction made to this
+  stockAdjustments    StockAdjustment[] // every manual correction made to this
 
   @@index([categoryId])
 }
@@ -155,10 +160,10 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices      Invoice[]         // every sale to this customer (cash or credit)
+  invoices      Invoice[] // every sale to this customer (cash or credit)
   payments      CustomerPayment[] // every payment received from this customer
-  ledgerEntries CustomerLedger[]  // full running-balance history
-  salesReturns  SalesReturn[]     // every return this customer made
+  ledgerEntries CustomerLedger[] // full running-balance history
+  salesReturns  SalesReturn[] // every return this customer made
 }
 
 model Supplier {
@@ -171,10 +176,10 @@ model Supplier {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchases       Purchase[]        // every stock buy-in from this supplier
+  purchases       Purchase[] // every stock buy-in from this supplier
   payments        SupplierPayment[] // every payment we made to this supplier
-  ledgerEntries   SupplierLedger[]  // full running-balance history
-  purchaseReturns PurchaseReturn[]  // every return we made to this supplier
+  ledgerEntries   SupplierLedger[] // full running-balance history
+  purchaseReturns PurchaseReturn[] // every return we made to this supplier
 }
 
 // ================================================================
@@ -193,7 +198,7 @@ model Salesman {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices Invoice[]     // every sale attributed to this salesman
+  invoices Invoice[] // every sale attributed to this salesman
   targets  SalesTarget[] // this salesman's target history, month by month
 }
 
@@ -214,7 +219,7 @@ model SalesTarget {
   month        DateTime // always the 1st of the month, e.g. 2026-07-01
   targetAmount Decimal  @db.Decimal(12, 2)
   description  String?
-  createdById  Int      // which User set/last edited this target
+  createdById  Int // which User set/last edited this target
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -225,9 +230,6 @@ model SalesTarget {
   @@index([salesmanId])
   @@index([createdById])
 }
-
-
-
 
 // ================================================================
 // BUSINESS EXPENSES
@@ -244,17 +246,18 @@ model ExpenseCategory {
 }
 
 model Expense {
-  id          Int      @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   categoryId  Int
-  amount      Decimal  @db.Decimal(12, 2)
-  expenseDate DateTime @default(now())
-  description String?  // e.g. "July diesel - delivery van"
-  createdById  Int      // which User set/last edited this target
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+  amount      Decimal         @db.Decimal(12, 2)
+  expenseDate DateTime        @default(now())
+  description String? // e.g. "July diesel - delivery van"
+  createdById Int // which User set/last edited this target
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
 
-  createdBy User     @relation(fields: [createdById], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
+
   @@index([categoryId])
   @@index([expenseDate])
 }
@@ -285,13 +288,13 @@ model StockMovement {
   id            Int           @id @default(autoincrement())
   productId     Int
   type          MovementType // IN our OUT
-  quantity      Int           // ALWAYS positive, in pieces. `type` (IN/OUT) gives
-                               // direction — there is no exception for adjustments
-                               // anymore. If a correction removes stock, write it as
-                               // an OUT movement with a positive quantity, not a
-                               // negative IN.
+  quantity      Int // ALWAYS positive, in pieces. `type` (IN/OUT) gives
+  // direction — there is no exception for adjustments
+  // anymore. If a correction removes stock, write it as
+  // an OUT movement with a positive quantity, not a
+  // negative IN.
   referenceType ReferenceType
-  referenceId   Int           // id of the Purchase/Invoice/Return/Adjustment that caused this
+  referenceId   Int // id of the Purchase/Invoice/Return/Adjustment that caused this
 
   // Which User's request triggered adjustStock() for this row. For
   // most movements this will match the createdById on the parent
@@ -300,9 +303,9 @@ model StockMovement {
   // stock audit trail is self-contained and doesn't require a join
   // through referenceType/referenceId just to answer "who touched
   // this product's stock".
-  createdById   Int
-  description   String?
-  createdAt     DateTime      @default(now())
+  createdById Int
+  description String?
+  createdAt   DateTime @default(now())
 
   product   Product @relation(fields: [productId], references: [id])
   createdBy User    @relation(fields: [createdById], references: [id])
@@ -310,6 +313,8 @@ model StockMovement {
   @@index([productId])
   @@index([referenceType, referenceId])
   @@index([createdById])
+  @@index([productId, createdAt])
+  @@index([createdAt])
 }
 
 // A manual, standalone correction — damaged goods, expired stock,
@@ -328,10 +333,10 @@ model StockMovement {
 model StockAdjustment {
   id          Int      @id @default(autoincrement())
   productId   Int
-  quantity    Int      // in pieces; positive = stock increased, negative = decreased
-  reason      String   // e.g. "Damaged", "Expired", "Recount"
+  quantity    Int // in pieces; positive = stock increased, negative = decreased
+  reason      String // e.g. "Damaged", "Expired", "Recount"
   notes       String?
-  createdById Int      // which User made this manual correction
+  createdById Int // which User made this manual correction
   createdAt   DateTime @default(now())
 
   product   Product @relation(fields: [productId], references: [id])
@@ -348,27 +353,28 @@ model StockAdjustment {
 // update. All of this happens inside ONE database transaction —
 // either the whole purchase is recorded or none of it is.
 
-
 model Purchase {
-  id            Int           @id @default(autoincrement())
-  purchaseNo    String        @unique // human-facing reference number, e.g. "PUR-0001"
-  supplierId    Int
-  purchaseDate  DateTime      @default(now())
-  subtotal      Decimal       @db.Decimal(12, 2) // sum of item totalCosts, before discount
-  discount      Decimal?      @default(0) @db.Decimal(12, 2)
-  total         Decimal       @db.Decimal(12, 2) // subtotal - discount; what actually hits SupplierLedger
-  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
-  creditApplied Decimal       @default(0) @db.Decimal(12, 2)
-  balanceDue    Decimal       @default(0) @db.Decimal(12, 2)
-  status        InvoiceStatus @default(UNPAID)
-  description   String?
-  createdById   Int      // which User entered this purchase
-  createdAt     DateTime      @default(now())
+  id             Int      @id @default(autoincrement())
+  purchaseNo     String   @unique // human-facing reference number, e.g. "PUR-0001"
+  supplierId     Int
+  purchaseDate   DateTime @default(now())
+  subtotal       Decimal  @db.Decimal(12, 2) // sum of item totalCosts, before discount
+  discount       Decimal? @default(0) @db.Decimal(12, 2)
+  total          Decimal  @db.Decimal(12, 2) // subtotal - discount; what actually hits SupplierLedger
+  paidAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  creditApplied  Decimal  @default(0) @db.Decimal(12, 2)
+  returnedAmount Decimal  @default(0) @db.Decimal(12, 2)
+  balanceDue     Decimal  @default(0) @db.Decimal(12, 2)
+
+  status      InvoiceStatus @default(UNPAID)
+  description String?
+  createdById Int // which User entered this purchase
+  createdAt   DateTime      @default(now())
 
   supplier  Supplier          @relation(fields: [supplierId], references: [id])
   createdBy User              @relation(fields: [createdById], references: [id])
   items     PurchaseItem[]
-  returns   PurchaseReturn[]  // returns made against this specific purchase - see PurchaseReturn.purchaseId
+  returns   PurchaseReturn[] // returns made against this specific purchase - see PurchaseReturn.purchaseId
   payments  SupplierPayment[] // payments recorded specifically against this purchase - see SupplierPayment.purchaseId
 
   @@index([supplierId])
@@ -380,7 +386,7 @@ model PurchaseItem {
   id         Int     @id @default(autoincrement())
   purchaseId Int
   productId  Int
-  quantity   Int     // in pieces - if a carton was received, staff enters the piece total
+  quantity   Int // in pieces - if a carton was received, staff enters the piece total
   unitCost   Decimal @db.Decimal(12, 2) // cost per piece, at time of purchase
   totalCost  Decimal @db.Decimal(12, 2) // quantity * unitCost
 
@@ -398,9 +404,9 @@ model PurchaseItem {
 // Reverses a purchase, partially or fully: stock goes back OUT,
 // and what you owed the supplier for those items goes down.
 model PurchaseReturn {
-  id          Int      @id @default(autoincrement())
-  returnNo    String?   @unique
-  supplierId  Int
+  id         Int     @id @default(autoincrement())
+  returnNo   String? @unique
+  supplierId Int
 
   // Which purchase this return is reversing. Nullable for the same reason
   // as SalesReturn.invoiceId - not every return is guaranteed to be tied
@@ -408,12 +414,12 @@ model PurchaseReturn {
   // across several deliveries), but whenever it IS set, it gives you real
   // traceability: "prove exactly which order this shortfall/damage came
   // from" for supplier disputes, instead of just a floating totalAmount.
-  purchaseId  Int
+  purchaseId Int
 
   returnDate  DateTime @default(now())
   totalAmount Decimal  @db.Decimal(12, 2)
   reason      String?
-  createdById Int      // which User recorded this return
+  createdById Int // which User recorded this return
   createdAt   DateTime @default(now())
 
   supplier  Supplier             @relation(fields: [supplierId], references: [id])
@@ -430,7 +436,7 @@ model PurchaseReturnItem {
   id               Int     @id @default(autoincrement())
   purchaseReturnId Int
   productId        Int
-  quantity         Int     // in pieces
+  quantity         Int // in pieces
   unitCost         Decimal @db.Decimal(12, 2)
   totalCost        Decimal @db.Decimal(12, 2)
 
@@ -453,18 +459,20 @@ model PurchaseReturnItem {
 // update. The customer now owes you the balanceDue.
 
 model Invoice {
-  id          Int           @id @default(autoincrement())
-  invoiceNo   String        @unique
-  customerId  Int?          // null = walk-in cash sale, no customer record needed
-  salesmanId  Int?          // null = no salesman attributed (e.g. counter sale)
-  saleType    SaleType      @default(CASH) // Cash or CREDIT
-  invoiceDate DateTime      @default(now())
-  subtotal    Decimal       @db.Decimal(12, 2)
-  discount    Decimal?       @default(0) @db.Decimal(12, 2)
-  total       Decimal       @db.Decimal(12, 2) // subtotal - discount; this is what counts toward salesman targets
-  paidAmount  Decimal       @default(0) @db.Decimal(12, 2)
-  creditApplied Decimal     @default(0) @db.Decimal(12, 2)
-  balanceDue  Decimal       @default(0) @db.Decimal(12, 2) // total - paidAmount - creditApplied
+  id             Int      @id @default(autoincrement())
+  invoiceNo      String   @unique
+  customerId     Int? // null = walk-in cash sale, no customer record needed
+  salesmanId     Int? // null = no salesman attributed (e.g. counter sale)
+  saleType       SaleType @default(CASH) // Cash or CREDIT
+  invoiceDate    DateTime @default(now())
+  subtotal       Decimal  @db.Decimal(12, 2)
+  discount       Decimal? @default(0) @db.Decimal(12, 2)
+  total          Decimal  @db.Decimal(12, 2) // subtotal - discount; this is what counts toward salesman targets
+  paidAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  creditApplied  Decimal  @default(0) @db.Decimal(12, 2)
+  returnedAmount Decimal  @default(0) @db.Decimal(12, 2)
+  balanceDue     Decimal  @default(0) @db.Decimal(12, 2) // total - paidAmount - creditApplied - returnedAmount
+
   status      InvoiceStatus @default(UNPAID) // derived from (paidAmount + creditApplied) vs total
   description String?
 
@@ -476,14 +484,14 @@ model Invoice {
   // authenticated session server-side, never trust a client-supplied
   // value for this field.
   createdById Int
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime @default(now())
 
-  customer         Customer?         @relation(fields: [customerId], references: [id])
-  salesman         Salesman?         @relation(fields: [salesmanId], references: [id])
-  createdBy        User              @relation(fields: [createdById], references: [id])
-  items            InvoiceItem[]
-  customerPayments CustomerPayment[] // payments recorded specifically against this invoice
-  salesReturns     SalesReturn[]     // returns made against this specific invoice - see SalesReturn.invoiceId
+  customer     Customer?           @relation(fields: [customerId], references: [id])
+  salesman     Salesman?           @relation(fields: [salesmanId], references: [id])
+  createdBy    User                @relation(fields: [createdById], references: [id])
+  items        InvoiceItem[]
+  salesReturns SalesReturn[] // returns made against this specific invoice - see SalesReturn.invoiceId
+  allocations  PaymentAllocation[]
 
   @@index([customerId])
   @@index([salesmanId])
@@ -493,10 +501,10 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   invoiceId Int
   productId Int
-  quantity  Int    // in pieces - if a carton was sold, staff enters the piece total
+  quantity  Int // in pieces - if a carton was sold, staff enters the piece total
   unitPrice Decimal @db.Decimal(12, 2) // selling price per piece, at time of sale
 
   // Snapshot of product.costPrice at the moment of sale. This is
@@ -520,9 +528,9 @@ model InvoiceItem {
 // reduces what that customer owes.
 
 model SalesReturn {
-  id          Int      @id @default(autoincrement())
-  returnNo    String?   @unique
-  customerId  Int?
+  id         Int     @id @default(autoincrement())
+  returnNo   String? @unique
+  customerId Int?
 
   // Which sale this return is reversing. Nullable so a goodwill/no-receipt
   // return is still possible, but whenever it's set, it's what lets a
@@ -532,14 +540,14 @@ model SalesReturn {
   // should only net a return against salesman performance when
   // invoiceId is present - a return with no invoiceId affects stock
   // and (if there's a customer) the ledger, but no salesman's number.
-  invoiceId   Int
+  invoiceId Int
 
-  returnDate  DateTime @default(now())
-  totalAmount Decimal  @db.Decimal(12, 2)
-  refundType  String   @default("CREDIT") // CREDIT (store credit) or CASH (refund paid)
+  returnDate  DateTime              @default(now())
+  totalAmount Decimal               @db.Decimal(12, 2)
+  refundType  SalesReturnRefundType @default(CREDIT)
   reason      String?
-  createdById Int      // which User recorded this return
-  createdAt   DateTime @default(now())
+  createdById Int // which User recorded this return
+  createdAt   DateTime              @default(now())
 
   customer  Customer?         @relation(fields: [customerId], references: [id])
   invoice   Invoice?          @relation(fields: [invoiceId], references: [id])
@@ -552,12 +560,13 @@ model SalesReturn {
 }
 
 model SalesReturnItem {
-  id            Int     @id @default(autoincrement())
-  salesReturnId Int
-  productId     Int
-  quantity      Int     // in pieces
-  unitPrice     Decimal @db.Decimal(12, 2)
-  totalPrice    Decimal @db.Decimal(12, 2)
+  id              Int     @id @default(autoincrement())
+  salesReturnId   Int
+  productId       Int
+  quantity        Int // in pieces
+  unitPrice       Decimal @db.Decimal(12, 2)
+  costPriceAtSale Decimal @db.Decimal(12, 2)
+  totalPrice      Decimal @db.Decimal(12, 2)
 
   salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
   product     Product     @relation(fields: [productId], references: [id])
@@ -577,33 +586,38 @@ model SalesReturnItem {
 // a sign a write happened outside the proper transaction.
 
 model CustomerPayment {
-  id          Int      @id @default(autoincrement())
+  id          Int                 @id @default(autoincrement())
   customerId  Int
-  invoiceId   Int?     // null = general payment against overall balance, not one invoice
-  amount      Decimal  @db.Decimal(12, 2)
-  paymentDate DateTime @default(now())
+  amount      Decimal             @db.Decimal(12, 2)
+  paymentDate DateTime            @default(now())
   description String?
-  createdById Int      // which User recorded this payment as received
-  createdAt   DateTime @default(now())
+  /// Discriminates the nature of this record so cash-flow reports can
+  /// exclude non-cash movements:
+  ///   CASH              — real money received from the customer
+  ///   CREDIT_APPLICATION — store credit applied against an invoice (no cash changes hands)
+  ///   CASH_REFUND       — cash paid OUT to the customer (settles a negative balance)
+  paymentType CustomerPaymentType @default(CASH)
+  createdById Int // which User recorded this payment as received
+  createdAt   DateTime            @default(now())
 
-  customer  Customer @relation(fields: [customerId], references: [id])
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
-  createdBy User     @relation(fields: [createdById], references: [id])
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  createdBy   User                @relation(fields: [createdById], references: [id])
+  allocations PaymentAllocation[]
 
   @@index([customerId])
-  @@index([invoiceId])
   @@index([createdById])
 }
 
 model SupplierPayment {
-  id          Int      @id @default(autoincrement())
+  id          Int                 @id @default(autoincrement())
   supplierId  Int
-  purchaseId  Int?     // null = general payment against overall balance
-  amount      Decimal  @db.Decimal(12, 2)
-  paymentDate DateTime @default(now())
+  purchaseId  Int? // null = general payment against overall balance
+  amount      Decimal             @db.Decimal(12, 2)
+  paymentDate DateTime            @default(now())
   description String?
-  createdById Int      // which User recorded this payment as sent
-  createdAt   DateTime @default(now())
+  paymentType SupplierPaymentType @default(NORMAL)
+  createdById Int // which User recorded this payment as sent
+  createdAt   DateTime            @default(now())
 
   supplier  Supplier  @relation(fields: [supplierId], references: [id])
   purchase  Purchase? @relation(fields: [purchaseId], references: [id])
@@ -625,8 +639,8 @@ model CustomerLedger {
   customerId    Int
   debit         Decimal       @default(0) @db.Decimal(12, 2) // increases balance owed to us (credit sale)
   credit        Decimal       @default(0) @db.Decimal(12, 2) // decreases balance owed to us (payment, return)
-  balance       Decimal       @db.Decimal(12, 2)              // running balance after this entry
-  referenceType ReferenceType 
+  balance       Decimal       @db.Decimal(12, 2) // running balance after this entry
+  referenceType ReferenceType
   referenceId   Int
   description   String?
   createdAt     DateTime      @default(now())
@@ -635,6 +649,8 @@ model CustomerLedger {
 
   @@index([customerId])
   @@index([referenceType, referenceId])
+  @@index([customerId, createdAt])
+  @@index([createdAt])
 }
 
 // Same idea as CustomerLedger, but for what YOU owe suppliers.
@@ -646,7 +662,7 @@ model SupplierLedger {
   supplierId    Int
   debit         Decimal       @default(0) @db.Decimal(12, 2) // decreases what we owe them (payment)
   credit        Decimal       @default(0) @db.Decimal(12, 2) // increases what we owe them (purchase)
-  balance       Decimal       @db.Decimal(12, 2)              // running balance after this entry
+  balance       Decimal       @db.Decimal(12, 2) // running balance after this entry
   referenceType ReferenceType
   referenceId   Int
   notes         String?
@@ -656,4 +672,46 @@ model SupplierLedger {
 
   @@index([supplierId])
   @@index([referenceType, referenceId])
+  @@index([supplierId, createdAt])
+  @@index([createdAt])
+}
+
+model PaymentAllocation {
+  id                Int      @id @default(autoincrement())
+  customerPaymentId Int
+  invoiceId         Int
+  amountAllocated   Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+
+  customerPayment CustomerPayment @relation(fields: [customerPaymentId], references: [id], onDelete: Cascade)
+  invoice         Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([customerPaymentId, invoiceId])
+  @@index([customerPaymentId])
+  @@index([invoiceId])
+}
+
+model IdempotencyKey {
+  operation String
+  key       String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@id([operation, key])
+}
+
+enum CustomerPaymentType {
+  CASH
+  CREDIT_APPLICATION
+  CASH_REFUND
+}
+
+enum SupplierPaymentType {
+  NORMAL
+  ADVANCE
+}
+
+enum SalesReturnRefundType {
+  CASH
+  CREDIT
 }

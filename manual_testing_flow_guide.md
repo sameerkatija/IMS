@@ -94,14 +94,28 @@ This flow handles selling items to customers (on cash or credit) and processing 
 This flow is used when a customer pays down their overall balance, or when we pay a supplier.
 
 ### A. Recording a Customer Payment (`POST /api/payment/customer`)
-* **What it does:** Customer pays off their debt.
+* **What it does:** Customer pays off their debt (supports general unallocated payments or multi-invoice allocations).
 * **Transactional Flow (Atomic):**
-  1. Creates a `CustomerPayment` row.
-  2. **Invoice Settlement:** If paying against a specific invoice, it updates the invoice's `paidAmount` and `balanceDue`, and sets `status` to `PAID` or `PARTIALLY_PAID`.
+  1. Creates a `CustomerPayment` row (decoupled from single invoiceId).
+  2. **Invoice Settlement:** Creates `PaymentAllocation` records for target invoices, atomically increments invoice `paidAmount` and decrements `balanceDue` using conditional checks (`updateMany`), and recalculates status (`PAID` or `PARTIALLY_PAID`) inside the transaction block.
   3. Logs a credit entry in `CustomerLedger` and reduces `Customer.balance`.
-  4. *Constraint:* Try to pay more than what is due on the invoice or overall customer balance. The server must reject this with a `400 Bad Request`.
+  4. *Constraint:* Try to allocate more than what is due on the invoice or overall customer balance. The server must reject this with a `400 Bad Request` and roll back.
 
-### B. Recording a Supplier Payment (`POST /api/payment/supplier`)
+### B. Allocating Payments Post-Creation (`POST /api/payment/customer/allocate`)
+* **What it does:** Allocates an existing general customer payment to outstanding invoices later.
+* **Transactional Flow (Atomic):**
+  1. Locks the parent `CustomerPayment` row using a row-level lock (`FOR UPDATE`) to prevent concurrent allocation race conditions.
+  2. Verifies the sum of existing + new allocations does not exceed the payment amount.
+  3. Creates or updates (`upsert`) the `PaymentAllocation` records.
+  4. Updates the invoice balances atomically and recalculates status.
+
+### C. Ledger Reconciliations (`GET /api/customer/:id/reconcile` and `GET /api/supplier/:id/reconcile`)
+* **What it does:** Audits the ledger history for a customer/supplier.
+* **Verification Check:**
+  * Returns `inSync: true` and `drift: 0` if denormalized and ledger sums match.
+  * Reports duplicate ledger rows or broken reference linkages.
+
+### D. Recording a Supplier Payment (`POST /api/payment/supplier`)
 * **What it does:** We pay the supplier.
 * **Transactional Flow (Atomic):**
   1. Creates a `SupplierPayment` row.

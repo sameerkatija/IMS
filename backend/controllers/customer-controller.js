@@ -1,4 +1,5 @@
 const customer = require("../models/customer-model");
+const ledgerModel = require("../models/ledger-model");
 
 const getAllCustomers = async (req, res) => {
     try {
@@ -101,7 +102,9 @@ const getCustomerById = async (req, res) => {
 };
 const updateCustomer = async (req, res) => {
     try {
-        const data = await customer.updateCustomer(req.params.id, req.body);
+        const updateData = { ...req.body };
+        delete updateData.balance;
+        const data = await customer.updateCustomer(req.params.id, updateData);
         res.json({
             type: 'success',
             message: 'Customer updated successfully',
@@ -190,6 +193,20 @@ const getCustomerLedger = async (req, res) => {
     }
 };
 
+const reconcileCustomerLedger = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (isNaN(id)) {
+            return res.status(400).json({ type: "error", message: "Invalid customer ID" });
+        }
+        const result = await ledgerModel.reconcileCustomerLedger(id);
+        res.json({ type: "success", data: result });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ type: "error", message: err.message || "Failed to reconcile customer ledger" });
+    }
+};
+
 module.exports = {
     getAllCustomers,
     createCustomer,
@@ -197,5 +214,6 @@ module.exports = {
     updateCustomer,
     deactivateCustomer,
     activateCustomer,
-    getCustomerLedger
-}
+    getCustomerLedger,
+    reconcileCustomerLedger
+};

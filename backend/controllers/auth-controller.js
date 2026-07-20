@@ -177,7 +177,7 @@ const forgotPassword = async (req, res) => {
 
     } catch (error) {
         console.error("Forgot password error:", error);
-        res.status(550).json({
+        res.status(500).json({
             type: "error",
             message: "An error occurred while resetting the password."
         });

@@ -392,6 +392,7 @@ exports.createPurchaseReturnSchema = z.object({
     .trim()
     .optional()
     .nullable(),
+
   items: z.array(
     z.object({
       productId: z
@@ -499,6 +500,7 @@ exports.createSalesReturnSchema = z.object({
     .trim()
     .optional()
     .nullable(),
+
   items: z.array(
     z.object({
       productId: z

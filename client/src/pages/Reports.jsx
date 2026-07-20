@@ -352,7 +352,7 @@ const Reports = () => {
             <div className="space-y-6">
 
               {/* ===== TOP KPI CARDS ===== */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Gross Profit */}
                 <div className={`p-6 rounded-2xl border shadow-sm ${
                   Number(profitData) >= 0
@@ -377,20 +377,10 @@ const Reports = () => {
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
                   <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Total Overheads</p>
                   <p className="text-[10px] text-slate-400 mt-0.5">{expenseData.length} expense categories</p>
-                  <h3 className="text-2xl font-black mt-3 text-rose-600 dark:text-rose-400">
+                  <h3 className="text-2xl font-black mt-3 text-rose-600 dark:text-rose-455">
                     Rs. {Number(totalExpense).toLocaleString()}
                   </h3>
                   <p className="text-xs font-semibold mt-1 text-rose-400">▼ Operating Costs</p>
-                </div>
-
-                {/* Purchase Discounts Received */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
-                  <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Purchase Discounts</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Saved from supplier ingestions</p>
-                  <h3 className="text-2xl font-black mt-3 text-emerald-600 dark:text-emerald-400">
-                    Rs. {Number(netProfitData?.purchaseDiscounts || 0).toLocaleString()}
-                  </h3>
-                  <p className="text-xs font-semibold mt-1 text-emerald-500">▲ Cost Savings</p>
                 </div>
 
                 {/* Net Profit */}
@@ -402,7 +392,7 @@ const Reports = () => {
                   <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">
                     {(netProfitData?.netProfit ?? 0) >= 0 ? "Net Profit" : "Net Loss"}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Overheads &amp; discounts factored</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Overheads &amp; deductions factored</p>
                   <h3 className={`text-2xl font-black mt-3 ${
                     (netProfitData?.netProfit ?? 0) >= 0 ? "text-sky-600 dark:text-sky-400" : "text-rose-600 dark:text-rose-400"
                   }`}>
@@ -603,13 +593,13 @@ const Reports = () => {
                   <div>
                     <p className="text-[10px] text-slate-450 uppercase font-semibold">Total Investment (Asset Cost)</p>
                     <p className="font-bold text-slate-950 dark:text-white mt-0.5">
-                      Rs. {stockValuation.reduce((acc, curr) => acc + (curr.stockQuantity * Number(curr.costPrice)), 0).toLocaleString()}
+                      Rs. {Math.round(stockValuation.reduce((acc, curr) => acc + (curr.stockQuantity * Number(curr.costPrice)), 0)).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-450 uppercase font-semibold">Retail Valuation (Selling value)</p>
                     <p className="font-bold text-sky-600 mt-0.5">
-                      Rs. {stockValuation.reduce((acc, curr) => acc + (curr.stockQuantity * Number(curr.sellingPrice)), 0).toLocaleString()}
+                      Rs. {Math.round(stockValuation.reduce((acc, curr) => acc + (curr.stockQuantity * Number(curr.sellingPrice)), 0)).toLocaleString()}
                     </p>
                   </div>
                 </div>

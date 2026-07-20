@@ -224,7 +224,10 @@ const update = async (req, res) => {
             }
         }
 
-        const productItem = await product.update(id, req.body);
+        const updateData = { ...req.body };
+        delete updateData.stockQuantity;
+        delete updateData.weightedAvgCost;
+        const productItem = await product.update(id, updateData);
 
         return res.json({
             type: "success",

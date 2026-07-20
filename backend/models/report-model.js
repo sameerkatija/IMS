@@ -134,38 +134,30 @@ async function getDashboardMetrics() {
   const lowStockCount = lowStockRes[0]?.count ?? 0;
   const monthExpenses = Number(monthExpensesAgg._sum.amount || 0);
 
-  // Compute returned COGS for gross profit calculation
+  // Compute returned COGS for gross profit calculation using historical return cost
   const monthSalesReturns = await prisma.salesReturn.findMany({
     where: { returnDate: { gte: monthStart, lt: monthEnd } },
     include: {
-      items: {
-        include: {
-          product: {
-            select: { costPrice: true }
-          }
-        }
-      }
+      items: true
     }
   });
 
   let monthReturnedCOGS = 0;
   for (const ret of monthSalesReturns) {
     for (const item of ret.items) {
-      monthReturnedCOGS += item.quantity * Number(item.product.costPrice);
+      monthReturnedCOGS += item.quantity * Number(item.costPriceAtSale);
     }
   }
 
   const monthCOGS = Number(monthCOGSRes[0]?.cogs || 0);
   const monthGrossProfit = monthSales - (monthCOGS - monthReturnedCOGS);
-  const monthNetProfit = monthGrossProfit - monthExpenses + monthPurchaseDiscount;
+  // Purchase discounts are already baked into costPriceAtSale (lower COGS). Do NOT add them again.
+  const monthNetProfit = monthGrossProfit - monthExpenses;
 
-  // Resolve top products details with sales returns deducted and invoice discounts factored in
+  // Resolve top products details with sales returns deducted
   const netRevenueMap = {};
   for (const item of monthSalesItems) {
-    const subtotal = Number(item.invoice?.subtotal || 0);
-    const total = Number(item.invoice?.total || 0);
-    const ratio = subtotal > 0 ? (total / subtotal) : 1;
-    const netItemPrice = Number(item.totalPrice) * ratio;
+    const netItemPrice = Number(item.totalPrice);
 
     netRevenueMap[item.productId] = (netRevenueMap[item.productId] || 0) + netItemPrice;
   }
@@ -206,7 +198,6 @@ async function getDashboardMetrics() {
     lowStockCount,
     topProducts,
     monthExpenses,
-    monthPurchaseDiscount,
     monthNetProfit,
   };
 }
@@ -258,43 +249,37 @@ async function salesBySalesman(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const salesmen = await prisma.salesman.findMany({
-    where: { isActive: true },
-  });
+  const rows = await prisma.$queryRaw`
+    SELECT 
+      s.id AS "salesmanId", 
+      s.name AS "salesmanName",
+      COALESCE(i.gross, 0)::numeric AS gross,
+      COALESCE(r.returns, 0)::numeric AS returns,
+      (COALESCE(i.gross, 0) - COALESCE(r.returns, 0))::numeric AS net
+    FROM "Salesman" s
+    LEFT JOIN (
+      SELECT "salesmanId", SUM(total) AS gross
+      FROM "Invoice"
+      WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
+      GROUP BY "salesmanId"
+    ) i ON s.id = i."salesmanId"
+    LEFT JOIN (
+      SELECT inv."salesmanId", SUM(ret."totalAmount") AS returns
+      FROM "SalesReturn" ret
+      JOIN "Invoice" inv ON ret."invoiceId" = inv.id
+      WHERE ret."returnDate" >= ${fromDate} AND ret."returnDate" <= ${toDate}
+      GROUP BY inv."salesmanId"
+    ) r ON s.id = r."salesmanId"
+    ORDER BY net DESC
+  `;
 
-  const result = [];
-  for (const s of salesmen) {
-    const [grossAgg, returnsAgg] = await Promise.all([
-      prisma.invoice.aggregate({
-        _sum: { total: true },
-        where: {
-          salesmanId: s.id,
-          invoiceDate: { gte: fromDate, lte: toDate },
-        },
-      }),
-      prisma.salesReturn.aggregate({
-        _sum: { totalAmount: true },
-        where: {
-          invoice: { salesmanId: s.id },
-          returnDate: { gte: fromDate, lte: toDate },
-        },
-      }),
-    ]);
-
-    const gross = Number(grossAgg._sum.total || 0);
-    const returns = Number(returnsAgg._sum.totalAmount || 0);
-    const net = gross - returns;
-
-    result.push({
-      salesmanId: s.id,
-      salesmanName: s.name,
-      gross,
-      returns,
-      net,
-    });
-  }
-
-  return result.sort((a, b) => b.net - a.net);
+  return rows.map(r => ({
+    salesmanId: r.salesmanId,
+    salesmanName: r.salesmanName,
+    gross: Number(r.gross),
+    returns: Number(r.returns),
+    net: Number(r.net)
+  }));
 }
 
 /**
@@ -343,6 +328,16 @@ async function purchasesByDay(from, to, supplierId) {
 async function currentStockReport() {
   const products = await prisma.product.findMany({
     where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      size: true,
+      costPrice: true,          // user-visible reference price
+      weightedAvgCost: true,    // system-computed actual cost — used for valuation
+      sellingPrice: true,
+      stockQuantity: true,
+    },
   });
 
   let totalValueAtCost = 0;
@@ -350,9 +345,10 @@ async function currentStockReport() {
 
   const list = products.map((p) => {
     const qty = p.stockQuantity;
-    const cost = Number(p.costPrice);
+    const wac = Number(p.weightedAvgCost);   // actual blended cost paid for inventory
+    const ref = Number(p.costPrice);          // user reference price (shown separately)
     const selling = Number(p.sellingPrice);
-    const valCost = qty * cost;
+    const valCost = qty * wac;
     const valSelling = qty * selling;
 
     totalValueAtCost += valCost;
@@ -364,7 +360,8 @@ async function currentStockReport() {
       sku: p.sku,
       size: p.size,
       stockQuantity: qty,
-      costPrice: cost,
+      costPrice: ref,           // reference only — not used in any totals
+      weightedAvgCost: wac,     // the actual investment cost per unit
       sellingPrice: selling,
       valueAtCost: valCost,
       valueAtSellingPrice: valSelling,
@@ -398,24 +395,22 @@ async function lowStockReport() {
 async function customerLedgerReport() {
   const customers = await prisma.customer.findMany({
     where: { balance: { gt: 0 } },
+    include: {
+      invoices: {
+        where: { balanceDue: { gt: 0 } }
+      }
+    }
   });
 
   const result = [];
   const now = new Date();
 
   for (const customer of customers) {
-    const openInvoices = await prisma.invoice.findMany({
-      where: {
-        customerId: customer.id,
-        balanceDue: { gt: 0 },
-      },
-    });
-
     let bucket30 = 0;
     let bucket60 = 0;
     let bucketOver = 0;
 
-    for (const inv of openInvoices) {
+    for (const inv of customer.invoices) {
       const diffTime = Math.abs(now - new Date(inv.invoiceDate));
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const due = Number(inv.balanceDue);
@@ -472,11 +467,12 @@ async function profitReport(from, to) {
   const salesReturns = await prisma.salesReturn.findMany({
     where: { returnDate: { gte: fromDate, lte: toDate } },
     include: {
-      items: {
+      invoice: {
         include: {
-          product: { select: { costPrice: true } }
+          items: true
         }
-      }
+      },
+      items: true
     }
   });
 
@@ -484,10 +480,14 @@ async function profitReport(from, to) {
   let returnedCOGS = 0;
   for (const ret of salesReturns) {
     returnedRevenue += Number(ret.totalAmount || 0);
+    const invItems = ret.invoice?.items || [];
     for (const item of ret.items) {
-      returnedCOGS += item.quantity * Number(item.product.costPrice);
+      const matchedInvItem = invItems.find(ii => ii.productId === item.productId);
+      const originalCost = matchedInvItem ? Number(matchedInvItem.costPriceAtSale) : 0;
+      returnedCOGS += item.quantity * originalCost;
     }
   }
+
 
   const [totalSalesAgg, cogsRes] = await Promise.all([
     prisma.invoice.aggregate({
@@ -553,11 +553,12 @@ async function netProfitReport(from, to) {
   const salesReturns = await prisma.salesReturn.findMany({
     where: { returnDate: { gte: fromDate, lte: toDate } },
     include: {
-      items: {
+      invoice: {
         include: {
-          product: { select: { costPrice: true } }
+          items: true
         }
-      }
+      },
+      items: true
     }
   });
 
@@ -565,12 +566,16 @@ async function netProfitReport(from, to) {
   let returnedCOGS = 0;
   for (const ret of salesReturns) {
     returnedRevenue += Number(ret.totalAmount || 0);
+    const invItems = ret.invoice?.items || [];
     for (const item of ret.items) {
-      returnedCOGS += item.quantity * Number(item.product.costPrice);
+      const matchedInvItem = invItems.find(ii => ii.productId === item.productId);
+      const originalCost = matchedInvItem ? Number(matchedInvItem.costPriceAtSale) : 0;
+      returnedCOGS += item.quantity * originalCost;
     }
   }
 
-  const [totalSalesAgg, cogsRes, expensesAgg, purchaseDiscountsAgg] = await Promise.all([
+
+  const [totalSalesAgg, cogsRes, expensesAgg] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
       where: { invoiceDate: { gte: fromDate, lte: toDate } },
@@ -587,23 +592,18 @@ async function netProfitReport(from, to) {
         expenseDate: { gte: fromDate, lte: toDate },
       },
     }),
-    prisma.purchase.aggregate({
-      _sum: { discount: true },
-      where: { purchaseDate: { gte: fromDate, lte: toDate } },
-    }),
   ]);
 
   const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
   const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
   const grossProfit = sales - cogs;
   const totalExpenses = Number(expensesAgg._sum.amount || 0);
-  const purchaseDiscounts = Number(purchaseDiscountsAgg._sum.discount || 0);
-  const netProfit = grossProfit - totalExpenses + purchaseDiscounts;
+  // Purchase discounts are already baked into costPriceAtSale (lower COGS). Do NOT add them again.
+  const netProfit = grossProfit - totalExpenses;
 
   return {
     grossProfit,
     totalExpenses,
-    purchaseDiscounts,
     netProfit,
   };
 }
@@ -646,10 +646,7 @@ async function salesByProduct(from, to) {
     const name = item.product
       ? `${item.product.name}${item.product.size ? ` (${item.product.size})` : ""}`
       : "Unknown Product";
-    const subtotal = Number(item.invoice?.subtotal || 0);
-    const total = Number(item.invoice?.total || 0);
-    const ratio = subtotal > 0 ? (total / subtotal) : 1;
-    const netItemPrice = Number(item.totalPrice) * ratio;
+    const netItemPrice = Number(item.totalPrice);
 
     productSales[name] = (productSales[name] || 0) + netItemPrice;
   }
@@ -711,10 +708,7 @@ async function salesByCategory(from, to) {
 
   for (const item of items) {
     const name = item.product?.category?.name || "Uncategorized";
-    const subtotal = Number(item.invoice?.subtotal || 0);
-    const total = Number(item.invoice?.total || 0);
-    const ratio = subtotal > 0 ? (total / subtotal) : 1;
-    const netItemPrice = Number(item.totalPrice) * ratio;
+    const netItemPrice = Number(item.totalPrice);
 
     categorySales[name] = (categorySales[name] || 0) + netItemPrice;
   }

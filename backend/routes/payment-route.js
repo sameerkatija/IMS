@@ -6,6 +6,8 @@ const { createCustomerPaymentSchema, createSupplierPaymentSchema } = require("..
 
 // Customer payments
 router.post("/customer", validate(createCustomerPaymentSchema), paymentController.recordCustomerPayment);
+router.post("/customer/refund-credit", paymentController.refundCustomerCredit);
+router.post("/customer/allocate", paymentController.allocateCustomerPayment);
 router.get("/customer", paymentController.listCustomerPayments);
 
 // Supplier payments

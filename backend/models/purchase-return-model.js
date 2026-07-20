@@ -112,7 +112,7 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
       },
     });
 
-    // 6. Create PurchaseReturnItems and run stock engine OUT movements
+    // 6. Create PurchaseReturnItems, reverse WAC, and run stock engine OUT movements
     for (const item of validatedItems) {
       await tx.purchaseReturnItem.create({
         data: {
@@ -124,7 +124,41 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
         },
       });
 
-      // Adjust stock (decrementing)
+      // Reverse the WAC for returned units BEFORE adjustStock decrements stockQuantity.
+      // Formula: newWAC = (currentPool − returnedCost) / remainingQty
+      // where currentPool = currentStock × currentWAC  and  returnedCost = returnedQty × returnUnitCost
+      // If all units are gone, WAC resets to 0.
+      // Lock product row to prevent concurrent WAC calculation race conditions
+      const products = await tx.$queryRaw`
+        SELECT "stockQuantity", "weightedAvgCost" FROM "Product" 
+        WHERE id = ${item.productId} 
+        FOR UPDATE
+      `;
+      const productSnap = products[0];
+      const currentQty = Number(productSnap.stockQuantity);
+      const currentWAC = Number(productSnap.weightedAvgCost);
+      const remainingQty = currentQty - item.quantity;
+
+      let newWAC;
+      if (remainingQty <= 0) {
+        newWAC = 0;
+      } else {
+        const poolValue = currentQty * currentWAC;
+        const removedValue = item.quantity * item.unitCost; // net unit cost at time of original purchase
+        const netPoolValue = poolValue - removedValue;
+        if (netPoolValue <= 0) {
+          newWAC = currentWAC;
+        } else {
+          newWAC = netPoolValue / remainingQty;
+        }
+      }
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { weightedAvgCost: Math.round(newWAC * 10000) / 10000 },
+      });
+
+      // Adjust stock (decrementing) — happens AFTER WAC reversal so the formula above has correct qty
       await stockModel.adjustStock(
         {
           productId: item.productId,
@@ -153,6 +187,28 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
         tx
       );
     }
+
+    // 8. Update original Purchase balanceDue and status to reflect the returned amount.
+    //    A return reduces the liability we have toward the supplier, so it reduces balanceDue.
+    //    This mirrors exactly how Invoice.balanceDue is updated when a sales return is processed.
+    const appliedToPurchase = Math.min(totalAmount, Number(purchase.balanceDue));
+    const newBalanceDue = Math.max(0, Number(purchase.balanceDue) - appliedToPurchase);
+    const newStatus =
+      newBalanceDue <= 0
+        ? "PAID"
+        : newBalanceDue < Number(purchase.total)
+        ? "PARTIALLY_PAID"
+        : "UNPAID";
+
+    await tx.purchase.update({
+      where: { id: purchaseId },
+      data: {
+        balanceDue: newBalanceDue,
+        status: newStatus,
+        returnedAmount: { increment: appliedToPurchase }
+      },
+    });
+
 
     return purchaseReturn;
   });

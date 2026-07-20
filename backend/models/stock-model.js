@@ -60,10 +60,10 @@ async function adjustStock({ productId, quantity, type, referenceType, reference
  */
 async function createAdjustment({ productId, quantity, reason, description, createdById }) {
   return prisma.$transaction(async (tx) => {
-    // Fetch product to obtain costPrice
+    // Fetch product to obtain weightedAvgCost
     const product = await tx.product.findUnique({
       where: { id: productId },
-      select: { costPrice: true, name: true }
+      select: { weightedAvgCost: true, name: true }
     });
     if (!product) {
       throw new Error("Product not found");
@@ -101,7 +101,7 @@ async function createAdjustment({ productId, quantity, reason, description, crea
         create: { name: expenseCategoryName, isActive: true }
       });
 
-      const unitCost = Number(product.costPrice) || 0;
+      const unitCost = Number(product.weightedAvgCost) || 0;
       const expenseAmount = unitCost * Math.abs(quantity); // Loss is logged as a positive expense amount
 
       await tx.expense.create({
