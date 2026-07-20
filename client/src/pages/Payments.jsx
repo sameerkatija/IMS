@@ -113,6 +113,28 @@ const Payments = () => {
     }
   }, [activeTab]);
 
+  // Auto-allocate/redistribute customer payment allocations when amount changes
+  useEffect(() => {
+    const amt = Number(custForm.amount || 0);
+    const checkedInvIds = Object.keys(allocations).map(Number);
+    if (checkedInvIds.length === 0 || custForm.isCreditApplied) return;
+
+    let remaining = amt;
+    const newAllocations = {};
+    for (const inv of custInvoices) {
+      if (checkedInvIds.includes(inv.id)) {
+        const autoAmt = Math.min(Number(inv.balanceDue), remaining);
+        if (autoAmt > 0) {
+          newAllocations[inv.id] = autoAmt.toString();
+          remaining -= autoAmt;
+        } else {
+          newAllocations[inv.id] = "0";
+        }
+      }
+    }
+    setAllocations(newAllocations);
+  }, [custForm.amount]);
+
 
   // Load customer invoices + fresh balance when customer is selected in modal
   const handleCustomerSelect = async (id) => {
@@ -439,21 +461,19 @@ const Payments = () => {
         <nav className="flex space-x-8 text-sm font-medium">
           <button
             onClick={() => setActiveTab("customers")}
-            className={`py-4 border-b-2 px-1 transition-all ${
-              activeTab === "customers"
-                ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
+            className={`py-4 border-b-2 px-1 transition-all ${activeTab === "customers"
+              ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+              }`}
           >
             Customer Payouts (Collections)
           </button>
           <button
             onClick={() => setActiveTab("suppliers")}
-            className={`py-4 border-b-2 px-1 transition-all ${
-              activeTab === "suppliers"
-                ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
+            className={`py-4 border-b-2 px-1 transition-all ${activeTab === "suppliers"
+              ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+              }`}
           >
             Supplier Payouts (Settlements)
           </button>
@@ -550,13 +570,12 @@ const Payments = () => {
                           <td className="px-6 py-4 text-slate-500 text-xs">
                             {p.description || <span className="italic text-slate-400">No notes</span>}
                           </td>
-                          <td className={`px-6 py-4 text-right font-bold ${
-                            p.paymentType === "CASH_REFUND"
-                              ? "text-rose-600 dark:text-rose-400"
-                              : p.paymentType === "CREDIT_APPLICATION"
+                          <td className={`px-6 py-4 text-right font-bold ${p.paymentType === "CASH_REFUND"
+                            ? "text-rose-600 dark:text-rose-400"
+                            : p.paymentType === "CREDIT_APPLICATION"
                               ? "text-sky-600 dark:text-sky-400"
                               : "text-emerald-600 dark:text-emerald-450"
-                          }`}>
+                            }`}>
                             {p.paymentType === "CASH_REFUND" ? "−" : "+"}Rs. {Number(p.amount).toFixed(2)}
                           </td>
                           <td className="px-6 py-4 text-right">
@@ -624,11 +643,10 @@ const Payments = () => {
                       <>
                         {/* Live balance status banner */}
                         {freshCustomerBalance !== null && (
-                          <div className={`text-xs px-3 py-2 rounded-lg font-medium ${
-                            liveBalance < 0
-                              ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                              : "bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                          }`}>
+                          <div className={`text-xs px-3 py-2 rounded-lg font-medium ${liveBalance < 0
+                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                            : "bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                            }`}>
                             {liveBalance < 0
                               ? `✦ Store Credit on Account: Rs. ${Math.abs(liveBalance).toFixed(2)}`
                               : `Ledger Balance: Rs. ${liveBalance.toFixed(2)} outstanding.`
@@ -715,8 +733,13 @@ const Payments = () => {
                                           checked={isChecked}
                                           onChange={(e) => {
                                             if (e.target.checked) {
+                                              let amt = Number(custForm.amount || 0);
+                                              if (amt === 0) {
+                                                amt = Number(inv.balanceDue);
+                                                setCustForm({ ...custForm, amount: amt.toString() });
+                                              }
                                               const currentSum = Object.values(allocations).reduce((sum, val) => sum + Number(val || 0), 0);
-                                              const remaining = Math.max(0, Number(custForm.amount || 0) - currentSum);
+                                              const remaining = Math.max(0, amt - currentSum);
                                               const autoAmt = Math.min(Number(inv.balanceDue), remaining);
                                               setAllocations({ ...allocations, [inv.id]: autoAmt.toString() });
                                             } else {
@@ -747,7 +770,7 @@ const Payments = () => {
                               </div>
                             ) : (
                               <div className="text-xs text-slate-400 italic py-2">
-                                ✓ No outstanding invoices found. Payment will be held as general advance credit.
+                                ✓ No outstanding invoices found.
                               </div>
                             )}
                           </div>
@@ -768,9 +791,8 @@ const Payments = () => {
                         onChange={(e) => setCustForm({ ...custForm, amount: e.target.value })}
                         placeholder="0.00"
                         readOnly={custForm.isCreditApplied}
-                        className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold ${
-                          custForm.isCreditApplied ? "opacity-70 cursor-not-allowed" : ""
-                        }`}
+                        className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold ${custForm.isCreditApplied ? "opacity-70 cursor-not-allowed" : ""
+                          }`}
                       />
                       {custForm.isCreditApplied && (
                         <p className="text-xs text-slate-400 mt-1">Auto-set to invoice balance due.</p>
@@ -866,11 +888,10 @@ const Payments = () => {
 
                     return (
                       <>
-                        <div className={`text-xs px-3 py-2 rounded-lg font-medium ${
-                          liveBalance < 0
-                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                            : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-450 border border-amber-200 dark:border-amber-800"
-                        }`}>
+                        <div className={`text-xs px-3 py-2 rounded-lg font-medium ${liveBalance < 0
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                          : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-450 border border-amber-200 dark:border-amber-800"
+                          }`}>
                           {liveBalance < 0
                             ? `✦ Available Credit Balance to Refund: Rs. ${availableCredit.toFixed(2)}`
                             : `Customer has no credit balance on account (Balance is Rs. ${liveBalance.toFixed(2)}).`

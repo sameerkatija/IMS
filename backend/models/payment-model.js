@@ -48,8 +48,18 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
         throw error;
       }
     } else {
-      if (finalAllocations.length === 0) {
-        // General account/advance payment - allowed to go into negative balance (store credit)
+      const customerBalance = Number(customer.balance);
+      if (customerBalance <= 0) {
+        const error = new Error("No payment allowed if customer does not owe anything.");
+        error.statusCode = 400;
+        throw error;
+      }
+      if (amount > customerBalance) {
+        const error = new Error(
+          `Payment amount (${amount}) cannot exceed customer overall outstanding balance (${customerBalance}).`
+        );
+        error.statusCode = 400;
+        throw error;
       }
     }
 
@@ -276,8 +286,18 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
         throw error;
       }
     } else {
-      if (!purchaseId) {
-        // General account/advance payment - allowed to exceed current balance
+      const supplierBalance = Number(supplier.balance);
+      if (supplierBalance <= 0) {
+        const error = new Error("No payment allowed if supplier does not have an outstanding balance.");
+        error.statusCode = 400;
+        throw error;
+      }
+      if (amount > supplierBalance) {
+        const error = new Error(
+          `Payment amount (${amount}) cannot exceed supplier overall outstanding balance (${supplierBalance}).`
+        );
+        error.statusCode = 400;
+        throw error;
       }
     }
 

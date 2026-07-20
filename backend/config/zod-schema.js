@@ -546,6 +546,20 @@ exports.createCustomerPaymentSchema = z.object({
     .trim()
     .optional()
     .nullable(),
+  allocations: z
+    .array(
+      z.object({
+        invoiceId: z
+          .coerce.number({ required_error: "Invoice ID is required.", invalid_type_error: "Invoice ID must be a number." })
+          .int({ message: "Invoice ID must be an integer." })
+          .positive({ message: "Invoice ID must be a positive integer." }),
+        amountAllocated: z
+          .coerce.number({ required_error: "Amount allocated is required.", invalid_type_error: "Amount allocated must be a number." })
+          .positive({ message: "Amount allocated must be a positive number." }),
+      })
+    )
+    .optional()
+    .nullable(),
 });
 
 exports.createSupplierPaymentSchema = z.object({

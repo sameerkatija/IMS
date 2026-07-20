@@ -829,10 +829,13 @@ async function criticalBugProbes(testEntities) {
         const ledgerEntry = await prisma.customerLedger.findFirst({
             where: { referenceType: "PAYMENT", referenceId: payment.id },
         });
-        if (ledgerEntry && Number(ledgerEntry.debit) === 100.0) {
-            log("[BUG-003] isCreditApplied posts a CustomerLedger debit entry", "PASS");
+        const customerAfter = await prisma.customer.findUnique({ where: { id: customer.id } });
+        if (!ledgerEntry && Number(customerAfter.balance) === -200.0) {
+            log("[BUG-003] isCreditApplied does NOT post extra CustomerLedger entry (no balance drift)", "PASS");
+        } else if (ledgerEntry) {
+            log("[BUG-003] isCreditApplied does NOT post extra CustomerLedger entry (no balance drift)", "FAIL", `Spurious ledger entry found (debit=${ledgerEntry.debit}, credit=${ledgerEntry.credit})`);
         } else {
-            log("[BUG-003] isCreditApplied posts a CustomerLedger debit entry", "FAIL", "Ledger entry missing or wrong amount");
+            log("[BUG-003] isCreditApplied does NOT post extra CustomerLedger entry (no balance drift)", "FAIL", `Balance drifted: expected -200, got ${customerAfter.balance}`);
         }
     } catch (err) {
         log("[BUG-003] recordCustomerPayment isCreditApplied test", "WARN", `Could not complete test: ${err.message}`);
@@ -853,10 +856,13 @@ async function criticalBugProbes(testEntities) {
         const ledgerEntry = await prisma.supplierLedger.findFirst({
             where: { referenceType: "PAYMENT", referenceId: payment.id },
         });
-        if (ledgerEntry && Number(ledgerEntry.credit) === 100.0) {
-            log("[BUG-004] Supplier isCreditApplied writes SupplierLedger credit entry", "PASS");
+        const supplierAfter = await prisma.supplier.findUnique({ where: { id: supplier.id } });
+        if (!ledgerEntry && Number(supplierAfter.balance) === -100.0) {
+            log("[BUG-004] Supplier isCreditApplied does NOT post extra SupplierLedger entry (no balance drift)", "PASS");
+        } else if (ledgerEntry) {
+            log("[BUG-004] Supplier isCreditApplied does NOT post extra SupplierLedger entry (no balance drift)", "FAIL", `Spurious ledger entry found (debit=${ledgerEntry.debit}, credit=${ledgerEntry.credit})`);
         } else {
-            log("[BUG-004] Supplier isCreditApplied writes SupplierLedger credit entry", "FAIL", "Ledger entry missing or incorrect");
+            log("[BUG-004] Supplier isCreditApplied does NOT post extra SupplierLedger entry (no balance drift)", "FAIL", `Balance drifted: expected -100, got ${supplierAfter.balance}`);
         }
     } catch (err) {
         log("[BUG-004] recordSupplierPayment isCreditApplied test", "WARN", `Could not complete test: ${err.message}`);

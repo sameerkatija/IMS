@@ -304,7 +304,7 @@ const Purchases = () => {
                             nextQueries[index] = query;
                             setSearchQueries(nextQueries);
                             setOpenDropdownIndex(index);
-                            
+
                             // If user clears input, clear selection
                             if (!query.trim()) {
                               handleItemChange(index, "productId", "");
@@ -312,22 +312,22 @@ const Purchases = () => {
                           }}
                           className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
                         />
-                        
+
                         {/* Custom Dropdown List */}
                         {openDropdownIndex === index && (
                           <>
                             {/* Backdrop click to close */}
                             <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
-                            
+
                             <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-20 divide-y divide-slate-100 dark:divide-slate-800">
                               {(() => {
                                 const q = (searchQueries[index] || "").toLowerCase().trim();
-                                const filtered = products.filter(p => 
-                                  p.name.toLowerCase().includes(q) || 
+                                const filtered = products.filter(p =>
+                                  p.name.toLowerCase().includes(q) ||
                                   (p.sku && p.sku.toLowerCase().includes(q)) ||
                                   (p.barcode && p.barcode.toLowerCase().includes(q))
                                 );
-                                
+
                                 if (filtered.length === 0) {
                                   return (
                                     <div className="px-3 py-2 text-xs text-slate-450 italic">
@@ -335,7 +335,7 @@ const Purchases = () => {
                                     </div>
                                   );
                                 }
-                                
+
                                 return filtered.map((p) => (
                                   <button
                                     key={p.id}
@@ -493,7 +493,7 @@ const Purchases = () => {
 
                   <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-right w-full md:w-80 space-y-1.5">
                     <div className="flex justify-between text-xs text-slate-400">
-                      <span>Items Subtotal:</span>
+                      <span>Gross Total:</span>
                       <span className="font-semibold">Rs. {formatCurrency(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-rose-500">
@@ -505,7 +505,7 @@ const Purchases = () => {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5">
-                      <span>Total Cost:</span>
+                      <span>Net Total:</span>
                       <span className="font-semibold">Rs. {formatCurrency(total)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-400">
@@ -748,7 +748,7 @@ const Purchases = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                 <div style={{ minWidth: '300px', fontSize: '12px' }}>
                   <div className="border-t border-slate-300 dark:border-slate-700 print:border-slate-300" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                    <span>Items Subtotal:</span>
+                    <span>Gross Total:</span>
                     <span style={{ fontWeight: '700' }}>PKR {formatCurrency(selectedPurchase.subtotal)}</span>
                   </div>
                   {Number(selectedPurchase.discount) > 0 && (
@@ -758,7 +758,7 @@ const Purchases = () => {
                     </div>
                   )}
                   <div className="border-t-2 border-slate-900 dark:border-slate-200 print:border-black" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', marginTop: '4px' }}>
-                    <span style={{ fontWeight: '800', fontSize: '13px' }}>NET TOTAL COST:</span>
+                    <span style={{ fontWeight: '800', fontSize: '13px' }}>NET TOTAL:</span>
                     <span style={{ fontWeight: '900', fontSize: '13px' }}>PKR {formatCurrency(selectedPurchase.total)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a' }}>
@@ -786,27 +786,27 @@ const Purchases = () => {
                 </div>
               </div>
 
-                {/* ===== ASSOCIATED RETURNS ===== */}
-                {selectedPurchase.returns && selectedPurchase.returns.length > 0 && (
-                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-250" style={{ marginTop: '12px', paddingTop: '8px', fontSize: '11px' }}>
-                    <span className="font-bold text-rose-600 dark:text-rose-450 block mb-1">Associated Returns:</span>
-                    <div style={{ paddingLeft: '4px' }} className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
-                      {selectedPurchase.returns.map((ret) => (
-                        <div key={ret.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{ret.returnNo}</span>
-                          <span className="font-bold">Rs. {formatCurrency(ret.totalAmount)}</span>
-                        </div>
-                      ))}
-                    </div>
+              {/* ===== ASSOCIATED RETURNS ===== */}
+              {selectedPurchase.returns && selectedPurchase.returns.length > 0 && (
+                <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-250" style={{ marginTop: '12px', paddingTop: '8px', fontSize: '11px' }}>
+                  <span className="font-bold text-rose-600 dark:text-rose-450 block mb-1">Associated Returns:</span>
+                  <div style={{ paddingLeft: '4px' }} className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                    {selectedPurchase.returns.map((ret) => (
+                      <div key={ret.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{ret.returnNo}</span>
+                        <span className="font-bold">Rs. {formatCurrency(ret.totalAmount)}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* ===== FOOTER NOTES ===== */}
-                {selectedPurchase.description && (
-                  <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
-                    Notes: {selectedPurchase.description}
-                  </div>
-                )}
+              {/* ===== FOOTER NOTES ===== */}
+              {selectedPurchase.description && (
+                <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
+                  Notes: {selectedPurchase.description}
+                </div>
+              )}
 
             </div>
           </div>

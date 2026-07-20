@@ -198,6 +198,9 @@ async function getDashboardMetrics() {
     lowStockCount,
     topProducts,
     monthExpenses,
+    monthCOGS,
+    monthReturnedCOGS,
+    monthGrossProfit,
     monthNetProfit,
   };
 }

@@ -58,60 +58,47 @@ async function getAdminUser() {
 }
 
 async function getFirstActiveCustomer() {
-  let cust = await prisma.customer.findFirst({ where: { isActive: true } });
-  if (!cust) {
-    cust = await prisma.customer.create({
-      data: { name: "Audit Test Customer", balance: 0, isActive: true }
-    });
-  }
-  return cust;
+  return prisma.customer.create({
+    data: { name: "Audit Test Customer " + Date.now(), balance: 0, isActive: true }
+  });
 }
 
 async function getFirstActiveSupplier() {
-  let supp = await prisma.supplier.findFirst({ where: { isActive: true } });
-  if (!supp) {
-    supp = await prisma.supplier.create({
-      data: { name: "Audit Test Supplier", balance: 0, isActive: true }
-    });
-  }
-  return supp;
+  return prisma.supplier.create({
+    data: { name: "Audit Test Supplier " + Date.now(), balance: 0, isActive: true }
+  });
 }
 
 async function getFirstActiveProduct() {
-  let prod = await prisma.product.findFirst({ where: { isActive: true } });
-  if (!prod) {
-    // Ensure a category exists before creating the product
-    let category = await prisma.category.findFirst();
-    if (!category) {
-      category = await prisma.category.create({ data: { name: "Audit Test Category" } });
+  let category = await prisma.category.findFirst({ where: { name: { startsWith: "Audit Test Category" } } });
+  if (!category) {
+    category = await prisma.category.create({ data: { name: "Audit Test Category " + Date.now() } });
+  }
+  let prod = await prisma.product.create({
+    data: {
+      name: "Audit Test Pepsi " + Date.now(),
+      categoryId: category.id,
+      costPrice: 100,
+      sellingPrice: 150,
+      weightedAvgCost: 100,
+      stockQuantity: 0,
+      isActive: true,
     }
-    prod = await prisma.product.create({
-      data: {
-        name: "Audit Test Pepsi",
-        categoryId: category.id,
-        costPrice: 100,
-        sellingPrice: 150,
-        weightedAvgCost: 100,
-        stockQuantity: 0,
-        isActive: true,
-      }
-    });
-  }
-  if (prod.stockQuantity <= 0) {
-    const admin = await getAdminUser();
-    const stockModel = require("../models/stock-model");
-    await stockModel.adjustStock({
-      productId: prod.id,
-      quantity: 10,
-      type: "IN",
-      referenceType: "ADJUSTMENT",
-      referenceId: 1,
-      description: "Setup stock for audit test",
-      createdById: admin ? admin.id : 1,
-    });
-    prod = await prisma.product.findUnique({ where: { id: prod.id } });
-  }
-  return prod;
+  });
+
+  const admin = await getAdminUser();
+  const stockModel = require("../models/stock-model");
+  await stockModel.adjustStock({
+    productId: prod.id,
+    quantity: 10,
+    type: "IN",
+    referenceType: "ADJUSTMENT",
+    referenceId: 1,
+    description: "Setup stock for audit test",
+    createdById: admin ? admin.id : 1,
+  });
+  
+  return prisma.product.findUnique({ where: { id: prod.id } });
 }
 
 async function getFirstAnyProduct() {
@@ -1206,38 +1193,163 @@ async function finalVerdict() {
   console.log(`  9. Ready for production? ${blocking.length === 0 ? "YES" : "NO"}`);
 }
 
+async function cleanupAuditData() {
+  console.log("\nCleaning up audit test data...");
+  try {
+    // 1. Delete payment allocations
+    await prisma.paymentAllocation.deleteMany({
+      where: {
+        OR: [
+          { customerPayment: { customer: { name: { startsWith: "Audit Test Customer" } } } },
+          { invoice: { customer: { name: { startsWith: "Audit Test Customer" } } } }
+        ]
+      }
+    });
+
+    // 2. Delete customer payments
+    await prisma.customerPayment.deleteMany({
+      where: { customer: { name: { startsWith: "Audit Test Customer" } } }
+    });
+
+    // 3. Delete customer ledgers
+    await prisma.customerLedger.deleteMany({
+      where: { customer: { name: { startsWith: "Audit Test Customer" } } }
+    });
+
+    // 4. Delete sales return items
+    await prisma.salesReturnItem.deleteMany({
+      where: { salesReturn: { customer: { name: { startsWith: "Audit Test Customer" } } } }
+    });
+
+    // 5. Delete sales returns
+    await prisma.salesReturn.deleteMany({
+      where: { customer: { name: { startsWith: "Audit Test Customer" } } }
+    });
+
+    // 6. Delete invoice items
+    await prisma.invoiceItem.deleteMany({
+      where: { invoice: { customer: { name: { startsWith: "Audit Test Customer" } } } }
+    });
+
+    // 7. Delete invoices
+    await prisma.invoice.deleteMany({
+      where: { customer: { name: { startsWith: "Audit Test Customer" } } }
+    });
+
+    // 8. Delete supplier payments
+    await prisma.supplierPayment.deleteMany({
+      where: { supplier: { name: { startsWith: "Audit Test Supplier" } } }
+    });
+
+    // 9. Delete supplier ledgers
+    await prisma.supplierLedger.deleteMany({
+      where: { supplier: { name: { startsWith: "Audit Test Supplier" } } }
+    });
+
+    // 10. Delete purchase return items
+    await prisma.purchaseReturnItem.deleteMany({
+      where: { purchaseReturn: { supplier: { name: { startsWith: "Audit Test Supplier" } } } }
+    });
+
+    // 11. Delete purchase returns
+    await prisma.purchaseReturn.deleteMany({
+      where: { supplier: { name: { startsWith: "Audit Test Supplier" } } }
+    });
+
+    // 12. Delete purchase items
+    await prisma.purchaseItem.deleteMany({
+      where: { purchase: { supplier: { name: { startsWith: "Audit Test Supplier" } } } }
+    });
+
+    // 13. Delete purchases
+    await prisma.purchase.deleteMany({
+      where: { supplier: { name: { startsWith: "Audit Test Supplier" } } }
+    });
+
+    // 14. Delete stock movements
+    await prisma.stockMovement.deleteMany({
+      where: {
+        OR: [
+          { description: { contains: "Audit Test" } },
+          { description: { contains: "SR-" } },
+          { description: { contains: "Invoice INV-" } },
+          { product: { name: { startsWith: "Audit Test" } } }
+        ]
+      }
+    });
+
+    // 15. Delete products
+    await prisma.product.deleteMany({
+      where: {
+        OR: [
+          { name: { startsWith: "Audit Test" } },
+          { category: { name: { startsWith: "Audit Test" } } }
+        ]
+      }
+    });
+
+    // 16. Delete categories
+    await prisma.category.deleteMany({
+      where: { name: { startsWith: "Audit Test Category" } }
+    });
+
+    // 17. Delete customers
+    await prisma.customer.deleteMany({
+      where: { name: { startsWith: "Audit Test Customer" } }
+    });
+
+    // 18. Delete suppliers
+    await prisma.supplier.deleteMany({
+      where: { name: { startsWith: "Audit Test Supplier" } }
+    });
+
+    // 19. Delete users
+    await prisma.user.deleteMany({
+      where: { name: { startsWith: "Audit Test Admin" } }
+    });
+
+    console.log("Cleanup completed successfully.");
+  } catch (err) {
+    console.error("Error during cleanup:", err);
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────
 async function main() {
-  console.log("\n" + "█".repeat(70));
-  console.log("  ERP COMPREHENSIVE QA AUDIT");
-  console.log("  Phases 1-8 + Critical Bug Probes");
-  console.log("█".repeat(70) + "\n");
+  try {
+    console.log("\n" + "█".repeat(70));
+    console.log("  ERP COMPREHENSIVE QA AUDIT");
+    console.log("  Phases 1-8 + Critical Bug Probes");
+    console.log("█".repeat(70) + "\n");
 
-  await safeRun("Phase 1 Invoice Invariants", phase1_InvoiceInvariants);
-  await safeRun("Phase 1 Purchase Invariants", phase1_PurchaseInvariants);
-  await safeRun("Phase 1 Stock Invariants", phase1_StockInvariants);
-  await safeRun("Phase 1 Customer Ledger", phase1_CustomerLedgerInvariants);
-  await safeRun("Phase 1 Supplier Ledger", phase1_SupplierLedgerInvariants);
-  await safeRun("Phase 2 Doc Number Race", phase2_DocNumberRaceCondition);
-  await safeRun("Phase 2 Payment Allocation Integrity", phase2_PaymentAllocationIntegrity);
-  await safeRun("Phase 2 Sales Return Qty", phase2_SalesReturnQuantityViolations);
-  await safeRun("Phase 2 Purchase Return Qty", phase2_PurchaseReturnQuantityViolations);
-  await safeRun("Phase 2 Idempotency Table", phase2_IdempotencyTableExists);
-  await safeRun("Phase 3 Cash Refund Invariants", phase3_CashRefundInvariants);
-  await safeRun("Phase 3 COGS Snapshot", phase3_COGSHistoricalSnapshot);
-  await safeRun("Phase 3 WAC Non-Negative", phase3_WACNonNegative);
-  await safeRun("Phase 4 Profit Consistency", phase4_ProfitReportConsistency);
-  await safeRun("Phase 4 Receivables/Payables", phase4_ReceivablesPayablesConsistency);
-  await safeRun("Phase 4 Inventory Value", phase4_InventoryValueConsistency);
-  await safeRun("Phase 5 Business Simulation", phase5_BusinessSimulation);
-  await safeRun("Phase 6 Transaction Rollback", phase6_TransactionRollback);
-  await safeRun("Phase 7 Orphan Checks", phase7_OrphanChecks);
-  await safeRun("Phase 7 Impossible Balances", phase7_ImpossibleBalances);
-  await safeRun("Phase 8 Performance Sanity", phase8_PerformanceSanity);
-  await safeRun("Critical Bug Probes", criticalBugProbes);
-  await finalVerdict();
+    await safeRun("Phase 1 Invoice Invariants", phase1_InvoiceInvariants);
+    await safeRun("Phase 1 Purchase Invariants", phase1_PurchaseInvariants);
+    await safeRun("Phase 1 Stock Invariants", phase1_StockInvariants);
+    await safeRun("Phase 1 Customer Ledger", phase1_CustomerLedgerInvariants);
+    await safeRun("Phase 1 Supplier Ledger", phase1_SupplierLedgerInvariants);
+    await safeRun("Phase 2 Doc Number Race", phase2_DocNumberRaceCondition);
+    await safeRun("Phase 2 Payment Allocation Integrity", phase2_PaymentAllocationIntegrity);
+    await safeRun("Phase 2 Sales Return Qty", phase2_SalesReturnQuantityViolations);
+    await safeRun("Phase 2 Purchase Return Qty", phase2_PurchaseReturnQuantityViolations);
+    await safeRun("Phase 2 Idempotency Table", phase2_IdempotencyTableExists);
+    await safeRun("Phase 3 Cash Refund Invariants", phase3_CashRefundInvariants);
+    await safeRun("Phase 3 COGS Snapshot", phase3_COGSHistoricalSnapshot);
+    await safeRun("Phase 3 WAC Non-Negative", phase3_WACNonNegative);
+    await safeRun("Phase 4 Profit Consistency", phase4_ProfitReportConsistency);
+    await safeRun("Phase 4 Receivables/Payables", phase4_ReceivablesPayablesConsistency);
+    await safeRun("Phase 4 Inventory Value", phase4_InventoryValueConsistency);
+    await safeRun("Phase 5 Business Simulation", phase5_BusinessSimulation);
+    await safeRun("Phase 6 Transaction Rollback", phase6_TransactionRollback);
+    await safeRun("Phase 7 Orphan Checks", phase7_OrphanChecks);
+    await safeRun("Phase 7 Impossible Balances", phase7_ImpossibleBalances);
+    await safeRun("Phase 8 Performance Sanity", phase8_PerformanceSanity);
+    await safeRun("Critical Bug Probes", criticalBugProbes);
+    await finalVerdict();
+  } finally {
+    await cleanupAuditData();
+  }
 }
 
 main()
