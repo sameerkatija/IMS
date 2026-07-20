@@ -160,8 +160,7 @@ const Payments = () => {
         setToast({ message: "An invoice is required when applying credit.", type: "error" });
         return;
       }
-      const totalInvoiceOutstanding = custInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue), 0);
-      const availableCredit = Math.max(0, totalInvoiceOutstanding - liveBalance);
+      const availableCredit = liveBalance < 0 ? Math.abs(liveBalance) : 0;
       const selectedInv = custInvoices.find(inv => inv.id === Number(custForm.invoiceId));
       const maxApplicable = selectedInv ? Math.min(availableCredit, Number(selectedInv.balanceDue)) : availableCredit;
 
@@ -173,14 +172,7 @@ const Payments = () => {
         return;
       }
     } else {
-      // Validate that payment does not exceed customer's outstanding balance
-      if (Number(custForm.amount) > liveBalance) {
-        setToast({
-          message: `Overpayment blocked! Amount (Rs.${custForm.amount}) exceeds outstanding balance (Rs.${liveBalance.toFixed(2)}).`,
-          type: "error"
-        });
-        return;
-      }
+      // General customer cash collection - allowed to exceed current balance (prepayment)
     }
 
 
@@ -387,13 +379,7 @@ const Payments = () => {
         return;
       }
     } else {
-      if (Number(suppForm.amount) > outstandingOwed) {
-        setToast({
-          message: `Overpayment blocked! Payment exceeds outstanding balance owed of Rs.${outstandingOwed.toFixed(2)}.`,
-          type: "error"
-        });
-        return;
-      }
+      // General supplier cash payment - allowed to exceed current balance (prepayment)
     }
 
     // If paying against purchase, validate purchase balance due
@@ -631,8 +617,7 @@ const Payments = () => {
                     const liveBalance = freshCustomerBalance !== null
                       ? freshCustomerBalance
                       : Number(customers.find(c => c.id === Number(custForm.customerId))?.balance || 0);
-                    const totalInvoiceOutstanding = custInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue), 0);
-                    const availableCredit = Math.max(0, totalInvoiceOutstanding - liveBalance);
+                    const availableCredit = liveBalance < 0 ? Math.abs(liveBalance) : 0;
                     const selectedInvoice = custInvoices.find(inv => inv.id === Number(custForm.invoiceId));
 
                     return (
@@ -1064,9 +1049,8 @@ const Payments = () => {
 
                   {(() => {
                     const selectedSupplier = suppliers.find(s => s.id === Number(suppForm.supplierId));
-                    const totalInvoiceOutstanding = suppPurchases.reduce((sum, p) => sum + Number(p.balanceDue), 0);
                     const supplierBalance = selectedSupplier ? Number(selectedSupplier.balance) : 0;
-                    const availableCredit = Math.max(0, totalInvoiceOutstanding - supplierBalance);
+                    const availableCredit = supplierBalance < 0 ? Math.abs(supplierBalance) : 0;
                     return suppForm.supplierId && (
                       <>
                         <div>

@@ -41,7 +41,20 @@ async function safeRun(label, fn) {
 // HELPERS
 // ─────────────────────────────────────────────────────────
 async function getAdminUser() {
-  return prisma.user.findFirst({ where: { role: "ADMIN" } });
+  let user = await prisma.user.findFirst({ where: { role: "ADMIN" } });
+  if (!user) {
+    const bcrypt = require("bcrypt");
+    user = await prisma.user.create({
+      data: {
+        name: "Audit Test Admin",
+        username: "audit_admin_" + Date.now(),
+        password: await bcrypt.hash("auditpass", 10),
+        role: "ADMIN",
+        isActive: true,
+      }
+    });
+  }
+  return user;
 }
 
 async function getFirstActiveCustomer() {
@@ -67,10 +80,15 @@ async function getFirstActiveSupplier() {
 async function getFirstActiveProduct() {
   let prod = await prisma.product.findFirst({ where: { isActive: true } });
   if (!prod) {
+    // Ensure a category exists before creating the product
+    let category = await prisma.category.findFirst();
+    if (!category) {
+      category = await prisma.category.create({ data: { name: "Audit Test Category" } });
+    }
     prod = await prisma.product.create({
       data: {
         name: "Audit Test Pepsi",
-        categoryId: 1,
+        categoryId: category.id,
         costPrice: 100,
         sellingPrice: 150,
         weightedAvgCost: 100,
@@ -1035,14 +1053,20 @@ async function criticalBugProbes() {
       createdById: adminUser.id,
     });
 
-    // Verify a ledger entry was recorded
+    // Verify NO new ledger entry was recorded for the credit application
+    // (the original return's CREDIT already moved the balance; creditApplied is just a reconciliation tag)
     const ledgerEntry = await prisma.customerLedger.findFirst({
       where: { referenceType: "PAYMENT", referenceId: payment.id }
     });
-    if (ledgerEntry && Number(ledgerEntry.debit) === 100.00) {
-      log("[BUG-003] recordCustomerPayment isCreditApplied posts CustomerLedger debit entry", "PASS");
+    const customerAfter = await prisma.customer.findUnique({ where: { id: customer.id } });
+    // Balance should be unchanged from -200 since no new ledger entry posted:
+    //   the isCreditApplied only tags the invoice, it does not move money in the ledger
+    if (!ledgerEntry && Number(customerAfter.balance) === -200.00) {
+      log("[BUG-003] recordCustomerPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "PASS");
+    } else if (ledgerEntry) {
+      log("[BUG-003] recordCustomerPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "FAIL", `Spurious ledger entry found (debit=${ledgerEntry.debit}, credit=${ledgerEntry.credit}) — double entry!`);
     } else {
-      log("[BUG-003] recordCustomerPayment isCreditApplied posts CustomerLedger debit entry", "FAIL", "Ledger entry missing or has wrong debit amount");
+      log("[BUG-003] recordCustomerPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "FAIL", `Balance drifted: expected -200, got ${customerAfter.balance}`);
     }
 
   } catch (err) {
@@ -1077,14 +1101,21 @@ async function criticalBugProbes() {
       createdById: adminUser.id,
     });
 
-    // Verify a ledger entry was recorded as a CREDIT (increases supplier balance towards 0)
+    // Verify NO new ledger entry was recorded for the credit application
+    // (the original purchase return's CREDIT already moved the supplier balance;
+    //  isCreditApplied only tags the purchase, it does not move money in the ledger)
     const ledgerEntry = await prisma.supplierLedger.findFirst({
       where: { referenceType: "PAYMENT", referenceId: payment.id }
     });
-    if (ledgerEntry && Number(ledgerEntry.credit) === 100.00) {
-      log("[BUG-004] recordSupplierPayment with isCreditApplied writes SupplierLedger credit entry", "PASS");
+    const supplierAfter = await prisma.supplier.findUnique({ where: { id: supplier.id } });
+    // After createPurchase the purchase ledger correctly moved balance: -200 to -100
+    // isCreditApplied must NOT post another entry, so balance stays at -100
+    if (!ledgerEntry && Number(supplierAfter.balance) === -100.00) {
+      log("[BUG-004] recordSupplierPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "PASS");
+    } else if (ledgerEntry) {
+      log("[BUG-004] recordSupplierPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "FAIL", `Spurious ledger entry found (debit=${ledgerEntry.debit}, credit=${ledgerEntry.credit}) - double entry!`);
     } else {
-      log("[BUG-004] recordSupplierPayment with isCreditApplied writes SupplierLedger credit entry", "FAIL", "Ledger entry missing or incorrect");
+      log("[BUG-004] recordSupplierPayment isCreditApplied does NOT post extra ledger entry (no balance drift)", "FAIL", `Balance drifted: expected -100 (after purchase credit), got ${supplierAfter.balance}`);
     }
   } catch (err) {
     log("[BUG-004] recordSupplierPayment with isCreditApplied test", "FAIL", err.message);

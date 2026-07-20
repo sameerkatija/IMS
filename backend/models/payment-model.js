@@ -49,14 +49,7 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
       }
     } else {
       if (finalAllocations.length === 0) {
-        // General account payment
-        if (amount > Number(customer.balance)) {
-          const error = new Error(
-            `Payment amount (${amount}) cannot exceed customer overall outstanding balance (${customer.balance}).`
-          );
-          error.statusCode = 400;
-          throw error;
-        }
+        // General account/advance payment - allowed to go into negative balance (store credit)
       }
     }
 
@@ -142,7 +135,11 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
       });
     }
 
-    // 5. Post entry in CustomerLedger
+    // 5. Post entry in CustomerLedger (cash payments only)
+    // Credit applications do NOT post a new ledger entry because the original
+    // sales return already posted a CREDIT that reduced the customer's balance.
+    // isCreditApplied just tags how the invoice's balanceDue was settled;
+    // it is a reconciliation label on the invoice, not a new money movement.
     if (!isCreditApplied) {
       await ledgerModel.recordCustomerLedgerEntry(
         {
@@ -152,18 +149,6 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
           referenceType: "PAYMENT",
           referenceId: payment.id,
           description: description || (finalAllocations.length === 1 ? `Payment for Invoice` : "Customer Payment Allocation"),
-        },
-        tx
-      );
-    } else {
-      await ledgerModel.recordCustomerLedgerEntry(
-        {
-          customerId,
-          debit: amount,
-          credit: 0,
-          referenceType: "PAYMENT",
-          referenceId: payment.id,
-          description: description || "Store credit applied to invoice(s)",
         },
         tx
       );
@@ -291,12 +276,8 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
         throw error;
       }
     } else {
-      if (amount > Number(supplier.balance)) {
-        const error = new Error(
-          `Payment amount (${amount}) cannot exceed supplier overall outstanding balance (${supplier.balance}).`
-        );
-        error.statusCode = 400;
-        throw error;
+      if (!purchaseId) {
+        // General account/advance payment - allowed to exceed current balance
       }
     }
 
@@ -331,6 +312,7 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
         amount,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
         description: description || (isCreditApplied ? `Credit note applied to Purchase #${targetPurchase.purchaseNo}` : undefined),
+        paymentType: purchaseId ? "NORMAL" : "ADVANCE",
         createdById,
       },
     });
@@ -368,7 +350,11 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
     }
 
 
-    // 6. Post entry in SupplierLedger
+    // 6. Post entry in SupplierLedger (cash payments only)
+    // Credit note applications do NOT post a new ledger entry because the original
+    // purchase return already posted a CREDIT that reduced the supplier's balance.
+    // isCreditApplied just tags how the purchase's balanceDue was settled;
+    // it is a reconciliation label on the purchase, not a new money movement.
     if (!isCreditApplied) {
       await ledgerModel.recordSupplierLedgerEntry(
         {
@@ -378,18 +364,6 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
           referenceType: "PAYMENT",
           referenceId: payment.id,
           description: description || (purchaseId ? `Payment for Purchase #${targetPurchase.purchaseNo}` : "General Account Payment"),
-        },
-        tx
-      );
-    } else {
-      await ledgerModel.recordSupplierLedgerEntry(
-        {
-          supplierId,
-          debit: 0,
-          credit: amount,
-          referenceType: "PAYMENT",
-          referenceId: payment.id,
-          description: description || `Supplier credit note applied to Purchase #${targetPurchase.purchaseNo}`,
         },
         tx
       );

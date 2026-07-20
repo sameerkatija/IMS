@@ -267,23 +267,6 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         );
       }
 
-      // When store credit (negative customer balance) is applied toward this invoice,
-      // post a CREDIT entry to consume that credit from the ledger.
-      // Without this, customer.balance remains overstated relative to invoice.balanceDue
-      // by exactly the creditApplied amount — a permanent accounting drift.
-      if (creditApplied > 0) {
-        await ledgerModel.recordCustomerLedgerEntry(
-          {
-            customerId,
-            debit: 0,
-            credit: creditApplied,
-            referenceType: "INVOICE",
-            referenceId: invoice.id,
-            description: `Store credit applied for Invoice ${invoiceNo}`,
-          },
-          tx
-        );
-      }
     }
 
 
@@ -368,6 +351,11 @@ function getInvoiceById(id) {
       },
       customer: true,
       salesman: true,
+      createdBy: {
+        select: {
+          name: true,
+        },
+      },
       salesReturns: {
         include: {
           items: {

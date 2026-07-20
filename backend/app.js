@@ -14,8 +14,8 @@ app.use(Express.json());
 app.use(helmet());
 app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
 app.use(cors({
-  origin: env.clientUrl,
-  credentials: true, // required so the httpOnly JWT cookie is sent/received
+    origin: env.clientUrl,
+    credentials: true, // required so the httpOnly JWT cookie is sent/received
 }));
 const fs = require('fs');
 const path = require('path');
