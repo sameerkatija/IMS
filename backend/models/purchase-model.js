@@ -184,7 +184,7 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       );
     }
 
-    // 7. If paidAmount > 0, log supplier payment
+    // 7. If paidAmount > 0, log supplier payment and allocate it to this purchase
     let upfrontPayment = null;
     if (paidAmount > 0) {
       upfrontPayment = await tx.supplierPayment.create({
@@ -195,6 +195,14 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
           paymentDate: purchase.purchaseDate,
           description: `Cash paid for Purchase ${purchaseNo}`,
           createdById,
+          allocations: {
+            create: [
+              {
+                purchaseId: purchase.id,
+                amountAllocated: paidAmount,
+              }
+            ]
+          }
         },
       });
     }

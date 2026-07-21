@@ -128,7 +128,8 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
       // Recalculate status and update the invoice
       const updatedInvoice = await tx.invoice.findUnique({ where: { id: alloc.invoiceId } });
       const totalSettled = Number(updatedInvoice.paidAmount) + Number(updatedInvoice.creditApplied || 0) + Number(updatedInvoice.returnedAmount || 0);
-      const newStatus = totalSettled >= Number(updatedInvoice.total) ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
+      const netPayable = Number(updatedInvoice.total) - Number(updatedInvoice.transportDiscount || 0);
+      const newStatus = totalSettled >= netPayable ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
       await tx.invoice.update({
         where: { id: alloc.invoiceId },
         data: { status: newStatus }
@@ -145,11 +146,12 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
       });
     }
 
-    // 5. Post entry in CustomerLedger (cash payments only)
-    // Credit applications do NOT post a new ledger entry because the original
-    // sales return already posted a CREDIT that reduced the customer's balance.
-    // isCreditApplied just tags how the invoice's balanceDue was settled;
-    // it is a reconciliation label on the invoice, not a new money movement.
+    // 5. Post entry in CustomerLedger
+    // For cash payments: post a CREDIT that reduces what the customer owes us.
+    // For credit applications: post a DEBIT that consumes the stored credit
+    // (brings Customer.balance back toward 0 from negative). Without this,
+    // Customer.balance would never be updated and the same credit could be
+    // applied to multiple invoices indefinitely — an accounting error.
     if (!isCreditApplied) {
       await ledgerModel.recordCustomerLedgerEntry(
         {
@@ -159,6 +161,20 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
           referenceType: "PAYMENT",
           referenceId: payment.id,
           description: description || (finalAllocations.length === 1 ? `Payment for Invoice` : "Customer Payment Allocation"),
+        },
+        tx
+      );
+    } else {
+      // CREDIT APPLICATION: consume the customer's store credit.
+      // Debit entry raises Customer.balance toward 0 (cancels the prior CREDIT).
+      await ledgerModel.recordCustomerLedgerEntry(
+        {
+          customerId,
+          debit: amount,
+          credit: 0,
+          referenceType: "PAYMENT",
+          referenceId: payment.id,
+          description: description || `Store credit applied via payment allocation`,
         },
         tx
       );
@@ -252,7 +268,7 @@ async function refundCustomerCreditBalance({ customerId, amount, refundDate, des
  * Records a supplier payment atomically.
  * Validates outstanding balances to prevent overpayments, and posts a debit to the ledger.
  */
-async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditApplied = false, paymentDate, description, createdById }) {
+async function recordSupplierPayment({ supplierId, purchaseId, allocations = [], amount, isCreditApplied = false, paymentDate, description, createdById }) {
   return prisma.$transaction(async (tx) => {
     // 1. Verify supplier exists and lock the row to serialize supplier payment transactions
     const suppliers = await tx.$queryRaw`
@@ -267,10 +283,18 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
       throw error;
     }
 
+    // Normalize purchaseId to allocations list for backward compatibility
+    let finalAllocations = [];
+    if (allocations && allocations.length > 0) {
+      finalAllocations = allocations;
+    } else if (purchaseId) {
+      finalAllocations = [{ purchaseId, amountAllocated: amount }];
+    }
+
     // 2. Validate supplier outstanding balance OR available credit
     if (isCreditApplied) {
-      if (!purchaseId) {
-        const error = new Error("Purchase ID is required when applying credit.");
+      if (finalAllocations.length === 0) {
+        const error = new Error("Allocations are required when applying credit.");
         error.statusCode = 400;
         throw error;
       }
@@ -301,80 +325,96 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
       }
     }
 
-    // 3. Verify purchase exists (if purchaseId provided)
-    let targetPurchase = null;
-    if (purchaseId) {
-      targetPurchase = await tx.purchase.findUnique({ where: { id: purchaseId } });
-      if (!targetPurchase) {
-        const error = new Error("Purchase not found.");
-        error.statusCode = 404;
-        throw error;
-      }
-      if (targetPurchase.supplierId !== supplierId) {
-        const error = new Error("Purchase does not belong to this supplier.");
-        error.statusCode = 400;
-        throw error;
-      }
-      if (amount > Number(targetPurchase.balanceDue)) {
-        const error = new Error(
-          `Payment amount (${amount}) cannot exceed outstanding purchase balance due (${targetPurchase.balanceDue}).`
-        );
+    // Validate that total allocations do not exceed the payment amount
+    const sumAllocated = finalAllocations.reduce((sum, alloc) => sum + Number(alloc.amountAllocated || alloc.amount || 0), 0);
+    if (sumAllocated > amount) {
+      const error = new Error(`Total allocated amount (${sumAllocated}) cannot exceed the payment amount (${amount}).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Validate that each allocation amount is positive
+    for (const alloc of finalAllocations) {
+      const allocAmt = Number(alloc.amountAllocated || alloc.amount || 0);
+      if (allocAmt <= 0) {
+        const error = new Error("Allocation amount must be positive.");
         error.statusCode = 400;
         throw error;
       }
     }
 
-    // 4. Create the SupplierPayment record
+    // Determine purchaseId for the single payment record
+    const singlePurchaseId = finalAllocations.length === 1 ? finalAllocations[0].purchaseId : null;
+    let targetPurchase = null;
+    if (singlePurchaseId) {
+      targetPurchase = await tx.purchase.findUnique({ where: { id: singlePurchaseId } });
+    }
+
+    // 3. Create the SupplierPayment record
     const payment = await tx.supplierPayment.create({
       data: {
         supplierId,
-        purchaseId,
+        purchaseId: singlePurchaseId,
         amount,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-        description: description || (isCreditApplied ? `Credit note applied to Purchase #${targetPurchase.purchaseNo}` : undefined),
-        paymentType: purchaseId ? "NORMAL" : "ADVANCE",
+        description: description || (isCreditApplied && targetPurchase ? `Credit note applied to Purchase #${targetPurchase.purchaseNo}` : undefined),
+        paymentType: singlePurchaseId ? "NORMAL" : "ADVANCE",
         createdById,
       },
     });
 
-    // 5. Update the Purchase payment progress (if targetPurchase provided)
-    if (purchaseId && targetPurchase) {
-      if (isCreditApplied) {
-        const newCreditApplied = Number(targetPurchase.creditApplied || 0) + amount;
-        const newPaidAmount = Number(targetPurchase.paidAmount || 0);
-        const newBalanceDue = Number(targetPurchase.total) - newPaidAmount - newCreditApplied - Number(targetPurchase.returnedAmount || 0);
-        const newStatus = (newPaidAmount + newCreditApplied + Number(targetPurchase.returnedAmount || 0)) >= Number(targetPurchase.total) ? "PAID" : "PARTIALLY_PAID";
+    // 4. Process allocations and update purchases atomically
+    for (const alloc of finalAllocations) {
+      const allocAmt = Number(alloc.amountAllocated || alloc.amount || 0);
+      const pid = alloc.purchaseId;
 
-        await tx.purchase.update({
-          where: { id: purchaseId },
-          data: {
-            creditApplied: newCreditApplied,
-            balanceDue: newBalanceDue,
-            status: newStatus,
-          },
-        });
-      } else {
-        const newPaidAmount = Number(targetPurchase.paidAmount || 0) + amount;
-        const newBalanceDue = Number(targetPurchase.total) - newPaidAmount - Number(targetPurchase.creditApplied || 0) - Number(targetPurchase.returnedAmount || 0);
-        const newStatus = (newPaidAmount + Number(targetPurchase.creditApplied || 0) + Number(targetPurchase.returnedAmount || 0)) >= Number(targetPurchase.total) ? "PAID" : "PARTIALLY_PAID";
+      // Atomic update with concurrency check
+      const updateResult = await tx.purchase.updateMany({
+        where: {
+          id: pid,
+          supplierId,
+          balanceDue: { gte: allocAmt }
+        },
+        data: isCreditApplied ? {
+          creditApplied: { increment: allocAmt },
+          balanceDue: { decrement: allocAmt }
+        } : {
+          paidAmount: { increment: allocAmt },
+          balanceDue: { decrement: allocAmt }
+        }
+      });
 
-        await tx.purchase.update({
-          where: { id: purchaseId },
-          data: {
-            paidAmount: newPaidAmount,
-            balanceDue: newBalanceDue,
-            status: newStatus,
-          },
-        });
+      if (updateResult.count === 0) {
+        const pur = await tx.purchase.findUnique({ where: { id: pid } });
+        if (!pur) {
+          throw new Error(`Purchase with ID ${pid} not found.`);
+        }
+        if (pur.supplierId !== supplierId) {
+          throw new Error(`Purchase ID ${pid} does not belong to Supplier ID ${supplierId}.`);
+        }
+        throw new Error(`Allocation of Rs. ${allocAmt.toFixed(2)} exceeds outstanding balance (Rs. ${Number(pur.balanceDue).toFixed(2)}) on Purchase #${pur.purchaseNo}.`);
       }
+
+      // Recalculate status and update the purchase
+      const updatedPurchase = await tx.purchase.findUnique({ where: { id: pid } });
+      const totalSettled = Number(updatedPurchase.paidAmount) + Number(updatedPurchase.creditApplied || 0) + Number(updatedPurchase.returnedAmount || 0);
+      const newStatus = totalSettled >= Number(updatedPurchase.total) ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
+      await tx.purchase.update({
+        where: { id: pid },
+        data: { status: newStatus }
+      });
+
+      // Save the allocation
+      await tx.supplierPaymentAllocation.create({
+        data: {
+          supplierPaymentId: payment.id,
+          purchaseId: pid,
+          amountAllocated: allocAmt,
+        }
+      });
     }
 
-
-    // 6. Post entry in SupplierLedger (cash payments only)
-    // Credit note applications do NOT post a new ledger entry because the original
-    // purchase return already posted a CREDIT that reduced the supplier's balance.
-    // isCreditApplied just tags how the purchase's balanceDue was settled;
-    // it is a reconciliation label on the purchase, not a new money movement.
+    // 5. Post entry in SupplierLedger (cash payments only)
     if (!isCreditApplied) {
       await ledgerModel.recordSupplierLedgerEntry(
         {
@@ -383,12 +423,11 @@ async function recordSupplierPayment({ supplierId, purchaseId, amount, isCreditA
           credit: 0,
           referenceType: "PAYMENT",
           referenceId: payment.id,
-          description: description || (purchaseId ? `Payment for Purchase #${targetPurchase.purchaseNo}` : "General Account Payment"),
+          description: description || (singlePurchaseId && targetPurchase ? `Payment for Purchase #${targetPurchase.purchaseNo}` : "General Account Payment"),
         },
         tx
       );
     }
-
 
     return payment;
   });
@@ -504,7 +543,8 @@ async function allocateCustomerPayment({ customerPaymentId, allocations }) {
       // Recalculate status and update the invoice
       const updatedInvoice = await tx.invoice.findUnique({ where: { id: alloc.invoiceId } });
       const totalSettled = Number(updatedInvoice.paidAmount) + Number(updatedInvoice.creditApplied || 0) + Number(updatedInvoice.returnedAmount || 0);
-      const newStatus = totalSettled >= Number(updatedInvoice.total) ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
+      const netPayable = Number(updatedInvoice.total) - Number(updatedInvoice.transportDiscount || 0);
+      const newStatus = totalSettled >= netPayable ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
       await tx.invoice.update({
         where: { id: alloc.invoiceId },
         data: { status: newStatus }
@@ -564,6 +604,15 @@ function getAllSupplierPayments({ where, skip, take }) {
           purchaseNo: true,
         },
       },
+      allocations: {
+        include: {
+          purchase: {
+            select: {
+              purchaseNo: true,
+            },
+          },
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",
@@ -578,11 +627,382 @@ function countSupplierPayments(where) {
   return prisma.supplierPayment.count({ where });
 }
 
+/**
+ * Allocates an existing general supplier payment to one or more purchases.
+ * Supports upsert logic: if an allocation already exists for the same purchase,
+ * it increments the allocation amount after validating all balance due guards atomically.
+ */
+async function allocateSupplierPayment({ supplierPaymentId, allocations }) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Lock the supplier payment row to prevent concurrent allocation race conditions
+    const payments = await tx.$queryRaw`
+      SELECT * FROM "SupplierPayment" 
+      WHERE id = ${supplierPaymentId} 
+      FOR UPDATE
+    `;
+    const payment = payments[0];
+    if (!payment) {
+      const error = new Error("Supplier payment not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Fetch existing allocations for this payment (safely locked now)
+    const existingAllocations = await tx.supplierPaymentAllocation.findMany({
+      where: { supplierPaymentId },
+    });
+
+    const supplierId = payment.supplierId;
+
+    // Calculate current allocated sum
+    const currentAllocatedSum = existingAllocations.reduce((sum, alloc) => sum + Number(alloc.amountAllocated), 0);
+    const availableAmount = Number(payment.amount) - currentAllocatedSum;
+
+    // 2. Validate new allocations total capacity
+    const newAllocatedSum = allocations.reduce((sum, alloc) => sum + Number(alloc.amountAllocated || alloc.amount || 0), 0);
+    if (newAllocatedSum > availableAmount) {
+      const error = new Error(`Allocated sum (${newAllocatedSum}) cannot exceed the available payment balance (${availableAmount}).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const results = [];
+
+    // 3. Process allocations atomically
+    for (const alloc of allocations) {
+      const allocAmt = Number(alloc.amountAllocated || alloc.amount || 0);
+      if (allocAmt <= 0) {
+        const error = new Error("Allocation amount must be positive.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Check if this payment already has an allocation for this purchase (upsert logic)
+      const existingAlloc = existingAllocations.find(a => a.purchaseId === alloc.purchaseId);
+
+      // Perform atomic updateMany to verify balanceDue and apply decrement
+      const updateResult = await tx.purchase.updateMany({
+        where: {
+          id: alloc.purchaseId,
+          supplierId,
+          balanceDue: { gte: allocAmt }
+        },
+        data: {
+          paidAmount: { increment: allocAmt },
+          balanceDue: { decrement: allocAmt }
+        }
+      });
+
+      if (updateResult.count === 0) {
+        const pur = await tx.purchase.findUnique({ where: { id: alloc.purchaseId } });
+        if (!pur) {
+          throw new Error(`Purchase with ID ${alloc.purchaseId} not found.`);
+        }
+        if (pur.supplierId !== supplierId) {
+          throw new Error(`Purchase ID ${alloc.purchaseId} does not belong to Supplier ID ${supplierId}.`);
+        }
+        throw new Error(`Allocation of Rs. ${allocAmt.toFixed(2)} exceeds outstanding balance (Rs. ${Number(pur.balanceDue).toFixed(2)}) on Purchase #${pur.purchaseNo}.`);
+      }
+
+      // Recalculate status and update the purchase
+      const updatedPurchase = await tx.purchase.findUnique({ where: { id: alloc.purchaseId } });
+      const totalSettled = Number(updatedPurchase.paidAmount) + Number(updatedPurchase.creditApplied || 0) + Number(updatedPurchase.returnedAmount || 0);
+      const newStatus = totalSettled >= Number(updatedPurchase.total) ? "PAID" : (totalSettled > 0 ? "PARTIALLY_PAID" : "UNPAID");
+      await tx.purchase.update({
+        where: { id: alloc.purchaseId },
+        data: { status: newStatus }
+      });
+
+      let allocationRecord;
+      if (existingAlloc) {
+        // Upsert: increment existing allocation amount
+        allocationRecord = await tx.supplierPaymentAllocation.update({
+          where: { id: existingAlloc.id },
+          data: {
+            amountAllocated: { increment: allocAmt },
+          },
+        });
+      } else {
+        // Create new allocation
+        allocationRecord = await tx.supplierPaymentAllocation.create({
+          data: {
+            supplierPaymentId,
+            purchaseId: alloc.purchaseId,
+            amountAllocated: allocAmt,
+          },
+        });
+      }
+
+      results.push(allocationRecord);
+    }
+
+    return results;
+  });
+}
+
+/**
+ * Applies a customer's existing store-credit balance directly to an existing invoice.
+ *
+ * Unlike recordCustomerPayment (isCreditApplied=true), this function:
+ *   - Does NOT create a CustomerPayment record or PaymentAllocation.
+ *   - Automatically caps the applied amount at min(availableCredit, invoiceBalanceDue),
+ *     so if the credit is larger than the invoice balance it still works without error.
+ *   - Posts a CustomerLedger DEBIT entry to consume the credit, keeping Customer.balance
+ *     in sync with the ledger (mandatory for data integrity — omitting this would cause drift).
+ *   - Updates Invoice.creditApplied, Invoice.balanceDue, and Invoice.status atomically.
+ *
+ * @param {number} customerId
+ * @param {number} invoiceId
+ * @param {number|null} amount - How much credit to apply. If null/omitted, applies as much
+ *                               as possible (up to min(availableCredit, balanceDue)).
+ */
+async function applyStoreCreditToInvoice({ customerId, invoiceId, amount, createdById }) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Lock customer row to serialize concurrent credit applications
+    const customers = await tx.$queryRaw`
+      SELECT * FROM "Customer"
+      WHERE id = ${customerId}
+      FOR UPDATE
+    `;
+    const customer = customers[0];
+    if (!customer) {
+      const error = new Error("Customer not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // 2. Check available credit (negative balance = we owe them)
+    const customerBalance = Number(customer.balance);
+    const availableCredit = customerBalance < 0 ? Math.abs(customerBalance) : 0;
+    if (availableCredit <= 0) {
+      const error = new Error("Customer has no available store credit to apply.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (amount !== null && amount !== undefined && amount <= 0) {
+      const error = new Error("Amount must be a positive number.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Validate invoice
+    const invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) {
+      const error = new Error("Invoice not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+    if (invoice.customerId !== customerId) {
+      const error = new Error("Invoice does not belong to this customer.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const invoiceBalanceDue = Number(invoice.balanceDue);
+    if (invoiceBalanceDue <= 0) {
+      const error = new Error(`Invoice ${invoice.invoiceNo} has no outstanding balance to apply credit against.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 4. Determine how much to actually apply — capped automatically at the smaller of the two
+    const requestedAmount = (amount !== null && amount !== undefined) ? Number(amount) : availableCredit;
+    const applyAmount = Math.min(requestedAmount, availableCredit, invoiceBalanceDue);
+    const roundedAmount = Math.round(applyAmount * 100) / 100;
+
+    if (roundedAmount <= 0) {
+      const error = new Error("Computed apply amount is zero. Nothing to apply.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 5. Update invoice fields atomically
+    const newCreditApplied = Number(invoice.creditApplied || 0) + roundedAmount;
+    const newBalanceDue = Math.max(0, Math.round((invoiceBalanceDue - roundedAmount) * 100) / 100);
+    const totalSettled =
+      Number(invoice.paidAmount || 0) +
+      newCreditApplied +
+      Number(invoice.returnedAmount || 0);
+    const invoiceTotal = Number(invoice.total);
+    const transportDiscount = Number(invoice.transportDiscount || 0);
+    const newStatus =
+      totalSettled + transportDiscount >= invoiceTotal
+        ? "PAID"
+        : totalSettled > 0
+        ? "PARTIALLY_PAID"
+        : "UNPAID";
+
+    await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        creditApplied: newCreditApplied,
+        balanceDue: newBalanceDue,
+        status: newStatus,
+      },
+    });
+
+    // 6. Post a DEBIT entry to the CustomerLedger to consume the credit.
+    //    This is NOT a new charge — it is the settlement of a prior CREDIT obligation.
+    //    Without this, Customer.balance would stay negative forever even after the
+    //    credit has been used, and the ledger sum would diverge from the stored balance.
+    await ledgerModel.recordCustomerLedgerEntry(
+      {
+        customerId,
+        debit: roundedAmount,
+        credit: 0,
+        referenceType: "INVOICE",
+        referenceId: invoiceId,
+        description: `Store credit applied to Invoice ${invoice.invoiceNo}`,
+      },
+      tx
+    );
+
+    return {
+      invoiceId,
+      invoiceNo: invoice.invoiceNo,
+      appliedAmount: roundedAmount,
+      newCreditApplied,
+      newBalanceDue,
+      newStatus,
+      remainingCredit: Math.round((availableCredit - roundedAmount) * 100) / 100,
+    };
+  });
+}
+
+/**
+ * Applies a supplier's existing credit balance (from over-payments / purchase returns)
+ * directly to an existing purchase's balanceDue.
+ *
+ * Mirrors the behaviour of applyStoreCreditToInvoice but for the supplier side.
+ * Caps amount at min(availableCredit, purchaseBalanceDue) automatically.
+ */
+async function applyStoreCreditToPurchase({ supplierId, purchaseId, amount, createdById }) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Lock supplier row
+    const suppliers = await tx.$queryRaw`
+      SELECT * FROM "Supplier"
+      WHERE id = ${supplierId}
+      FOR UPDATE
+    `;
+    const supplier = suppliers[0];
+    if (!supplier) {
+      const error = new Error("Supplier not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const supplierBalance = Number(supplier.balance);
+    const availableCredit = supplierBalance < 0 ? Math.abs(supplierBalance) : 0;
+    if (availableCredit <= 0) {
+      const error = new Error("Supplier has no available credit to apply.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (amount !== null && amount !== undefined && amount <= 0) {
+      const error = new Error("Amount must be a positive number.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 2. Validate purchase
+    const purchase = await tx.purchase.findUnique({ where: { id: purchaseId } });
+    if (!purchase) {
+      const error = new Error("Purchase not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+    if (purchase.supplierId !== supplierId) {
+      const error = new Error("Purchase does not belong to this supplier.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const purchaseBalanceDue = Number(purchase.balanceDue);
+    if (purchaseBalanceDue <= 0) {
+      const error = new Error(`Purchase ${purchase.purchaseNo} has no outstanding balance to apply credit against.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Cap the applied amount
+    const requestedAmount = (amount !== null && amount !== undefined) ? Number(amount) : availableCredit;
+    const applyAmount = Math.min(requestedAmount, availableCredit, purchaseBalanceDue);
+    const roundedAmount = Math.round(applyAmount * 100) / 100;
+
+    if (roundedAmount <= 0) {
+      const error = new Error("Computed apply amount is zero. Nothing to apply.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 4. Update purchase fields atomically
+    const newCreditApplied = Number(purchase.creditApplied || 0) + roundedAmount;
+    const newBalanceDue = Math.max(0, Math.round((purchaseBalanceDue - roundedAmount) * 100) / 100);
+    const totalSettled =
+      Number(purchase.paidAmount || 0) +
+      newCreditApplied +
+      Number(purchase.returnedAmount || 0);
+    const purchaseTotal = Number(purchase.total);
+    const newStatus =
+      totalSettled >= purchaseTotal
+        ? "PAID"
+        : totalSettled > 0
+        ? "PARTIALLY_PAID"
+        : "UNPAID";
+
+    await tx.purchase.update({
+      where: { id: purchaseId },
+      data: {
+        creditApplied: newCreditApplied,
+        balanceDue: newBalanceDue,
+        status: newStatus,
+      },
+    });
+
+    // 5. Post a CREDIT entry to the SupplierLedger to consume the credit.
+    //    SupplierLedger uses credit=increases debt / debit=decreases debt convention.
+    //    Consuming the supplier's credit (negative balance) requires a CREDIT entry
+    //    that brings the running balance back toward 0.
+    //    Wait — for suppliers, negative balance means WE have credit (we overpaid or returned more).
+    //    Consuming this credit against a purchase reduces what we owe, which is a DEBIT in supplier ledger.
+    //    But the credit was already registered as a DEBIT (purchase return / over-payment debit).
+    //    Applying that credit to a purchase effectively CREDITS the supplier ledger (re-adds obligation).
+    //    Net: supplier.balance goes from negative toward 0 (delta = credit - debit = roundedAmount - 0 = +roundedAmount).
+    //    Since the formula in recordSupplierLedgerEntry is delta = credit - debit, we pass credit=roundedAmount.
+    await ledgerModel.recordSupplierLedgerEntry(
+      {
+        supplierId,
+        debit: 0,
+        credit: roundedAmount,
+        referenceType: "PURCHASE",
+        referenceId: purchaseId,
+        description: `Supplier credit applied to Purchase ${purchase.purchaseNo}`,
+      },
+      tx
+    );
+
+    return {
+      purchaseId,
+      purchaseNo: purchase.purchaseNo,
+      appliedAmount: roundedAmount,
+      newCreditApplied,
+      newBalanceDue,
+      newStatus,
+      remainingCredit: Math.round((availableCredit - roundedAmount) * 100) / 100,
+    };
+  });
+}
+
 module.exports = {
   recordCustomerPayment,
   allocateCustomerPayment,
   refundCustomerCreditBalance,
+  applyStoreCreditToInvoice,
   recordSupplierPayment,
+  allocateSupplierPayment,
+  applyStoreCreditToPurchase,
   getAllCustomerPayments,
   countCustomerPayments,
   getAllSupplierPayments,

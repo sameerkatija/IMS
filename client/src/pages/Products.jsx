@@ -11,13 +11,13 @@ const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isActiveFilter, setIsActiveFilter] = useState("all");
   const [toast, setToast] = useState(null);
-  
+
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
   const [totalProducts, setTotalProducts] = useState(0);
-  
+
   // Form modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -41,7 +41,7 @@ const Products = () => {
       if (search.trim()) queryParams += `&search=${encodeURIComponent(search)}`;
       if (selectedCategory) queryParams += `&categoryId=${selectedCategory}`;
       if (isActiveFilter !== "all") queryParams += `&isActive=${isActiveFilter === "active"}`;
-      
+
       const response = await api.get(`/api/product${queryParams}`);
       if (response.data && response.data.type === "success") {
         setProducts(response.data.data);
@@ -165,14 +165,14 @@ const Products = () => {
 
   const toggleStatus = async (product) => {
     try {
-      const endpoint = product.isActive 
+      const endpoint = product.isActive
         ? `/api/product/${product.id}` // DELETE deactivates product
         : `/api/product/${product.id}/activate`; // PUT activates
-        
-      const response = product.isActive 
+
+      const response = product.isActive
         ? await api.delete(endpoint)
         : await api.put(endpoint);
-        
+
       if (response.data && response.data.type === "success") {
         setToast({ message: `Product ${product.isActive ? "deactivated" : "activated"} successfully.`, type: "success" });
         fetchProducts();
@@ -279,6 +279,7 @@ const Products = () => {
                     <th className="px-6 py-4">Product Name</th>
                     <th className="px-6 py-4">Category</th>
                     <th className="px-6 py-4 text-right">Cost Price</th>
+                    <th className="px-6 py-4 text-right">WAC Price</th>
                     <th className="px-6 py-4 text-right">Selling Price</th>
                     <th className="px-6 py-4 text-center">Stock Level</th>
                     <th className="px-6 py-4 text-center">Status</th>
@@ -304,15 +305,17 @@ const Products = () => {
                         <td className="px-6 py-4 text-right font-semibold">
                           Rs. {Number(p.costPrice).toFixed(2)}
                         </td>
+                        <td className="px-6 py-4 text-right font-semibold">
+                          Rs. {Number(p.weightedAvgCost).toFixed(2)}
+                        </td>
                         <td className="px-6 py-4 text-right font-semibold text-sky-600 dark:text-sky-400">
                           Rs. {Number(p.sellingPrice).toFixed(2)}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                            isLowStock 
-                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30"
-                              : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30"
-                          }`}>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${isLowStock
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30"
+                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30"
+                            }`}>
                             {isLowStock && <AlertTriangle size={12} className="mr-1" />}
                             {p.stockQuantity} pcs
                           </span>
@@ -323,13 +326,12 @@ const Products = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <button 
+                          <button
                             onClick={() => toggleStatus(p)}
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-                              p.isActive 
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40"
-                                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                            }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${p.isActive
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40"
+                              : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                              }`}
                           >
                             {p.isActive ? "Active" : "Inactive"}
                           </button>

@@ -8,7 +8,7 @@ const { generateDocNumber } = require("../config/doc-number");
  * Automatically decrements inventory levels, records salesman targets, log customer payments,
  * and updates the customer's ledger/balance if there's any credit component.
  */
-async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoiceDate, discount = 0, paidAmount = 0, creditApplied = 0, description, items, createdById }) {
+async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoiceDate, discount = 0, transportDiscount = 0, paidAmount = 0, creditApplied = 0, description, items, createdById }) {
   return prisma.$transaction(async (tx) => {
     // 1. Validate customer exists (if customerId is provided) and check credit limits
     if (customerId) {
@@ -90,12 +90,20 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
 
     // 4. Calculate invoice totals and outstanding balance due
     const finalDiscount = discount + totalItemDiscounts;
-    const total = subtotal - finalDiscount;
+    const total = subtotal - finalDiscount; // Running total (before transport discount)
     if (total < totalCost) {
-      const error = new Error(`Invoice discount is too high. Net total (Rs. ${total.toFixed(2)}) cannot go below the total cost price of the items (Rs. ${totalCost.toFixed(2)}).`);
+      const error = new Error(`Invoice discount is too high. Invoice total after standard discount (Rs. ${total.toFixed(2)}) cannot go below the total cost price of the items (Rs. ${totalCost.toFixed(2)}).`);
       error.statusCode = 400;
       throw error;
     }
+
+    if (transportDiscount < 0) {
+      const error = new Error("Transport discount cannot be negative.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const netPayable = total - transportDiscount;
 
     if (paidAmount < 0) {
       const error = new Error("Paid amount cannot be negative.");
@@ -109,8 +117,8 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       throw error;
     }
 
-    if (paidAmount + creditApplied > total) {
-      const error = new Error("Sum of paid amount and credit applied cannot exceed invoice total.");
+    if (paidAmount + creditApplied > netPayable) {
+      const error = new Error("Sum of paid amount and credit applied cannot exceed net payable amount.");
       error.statusCode = 400;
       throw error;
     }
@@ -140,7 +148,7 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       });
     }
 
-    const balanceDue = total - paidAmount - creditApplied;
+    const balanceDue = total - transportDiscount - paidAmount - creditApplied;
 
     // Enforce business rules & constraints
     if (saleType === "CREDIT" && !customerId) {
@@ -154,7 +162,6 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       error.statusCode = 400;
       throw error;
     }
-
     if (saleType === "CASH" && balanceDue > 0) {
       const error = new Error("Cash sales must be paid in full.");
       error.statusCode = 400;
@@ -163,7 +170,7 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
 
     // 5. Generate unique sequential invoice number
     const invoiceNo = await generateDocNumber(tx, "invoice", "INV");
-    const status = (paidAmount + creditApplied) >= total ? "PAID" : ((paidAmount + creditApplied) > 0 ? "PARTIALLY_PAID" : "UNPAID");
+    const status = (paidAmount + creditApplied + transportDiscount) >= total ? "PAID" : ((paidAmount + creditApplied + transportDiscount) > 0 ? "PARTIALLY_PAID" : "UNPAID");
 
     // 6. Create the Invoice record
     const invoice = await tx.invoice.create({
@@ -175,6 +182,7 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
         subtotal,
         discount: finalDiscount,
+        transportDiscount,
         total,
         paidAmount,
         creditApplied,
@@ -253,6 +261,20 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         );
       }
 
+      if (transportDiscount > 0) {
+        await ledgerModel.recordCustomerLedgerEntry(
+          {
+            customerId,
+            debit: 0,
+            credit: transportDiscount,
+            referenceType: "INVOICE",
+            referenceId: invoice.id,
+            description: `Transport discount allowance for Invoice ${invoiceNo}`,
+          },
+          tx
+        );
+      }
+
       if (paidAmount > 0) {
         await ledgerModel.recordCustomerLedgerEntry(
           {
@@ -267,6 +289,26 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
         );
       }
 
+    }
+
+    // 10. Record Transport Discount as a general expense
+    if (transportDiscount > 0) {
+      const expenseCategoryName = "transport discount";
+      const expCategory = await tx.expenseCategory.upsert({
+        where: { name: expenseCategoryName },
+        update: {},
+        create: { name: expenseCategoryName, isActive: true }
+      });
+
+      await tx.expense.create({
+        data: {
+          categoryId: expCategory.id,
+          amount: transportDiscount,
+          expenseDate: invoice.invoiceDate,
+          description: `Transport discount for Invoice ${invoiceNo}`,
+          createdById,
+        }
+      });
     }
 
 

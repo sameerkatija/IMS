@@ -29,6 +29,16 @@ const getAllCustomers = async (req, res) => {
             where.isActive = req.query.isActive === "true";
         }
 
+        if (req.query.balanceFilter) {
+            if (req.query.balanceFilter === "oweUs") {
+                where.balance = { gt: 0 };
+            } else if (req.query.balanceFilter === "weOwe") {
+                where.balance = { lt: 0 };
+            } else if (req.query.balanceFilter === "zero") {
+                where.balance = 0;
+            }
+        }
+
         const skip = (page - 1) * limit;
 
         const [customers, total] = await Promise.all([

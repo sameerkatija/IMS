@@ -463,10 +463,12 @@ async function setupTestEntities() {
     const supplier = await prisma.supplier.create({
         data: { name: "__QA_AUDIT_SUPPLIER__", balance: 0, isActive: true },
     });
+    const firstCategory = await prisma.category.findFirst();
+    if (!firstCategory) throw new Error("No category found — please seed the database first.");
     let product = await prisma.product.create({
         data: {
             name: "__QA_AUDIT_PRODUCT__",
-            categoryId: 1, // ADAPT: pick a real categoryId if 1 doesn't exist
+            categoryId: firstCategory.id,
             costPrice: 100,
             sellingPrice: 150,
             weightedAvgCost: 100,
@@ -505,6 +507,14 @@ async function teardownTestEntities({ customer, supplier, product }) {
     // matching your schema (invoice, salesReturn, purchase, purchaseReturn).
     // Adjust the relation field names if yours differ.
     const steps = [
+        ["Walk-in Sales Return Item (product)", () =>
+            prisma.salesReturnItem.deleteMany({ where: { productId: product.id } })],
+        ["Walk-in Sales Return (product)", () =>
+            prisma.salesReturn.deleteMany({ where: { invoice: { items: { some: { productId: product.id } } } } })],
+        ["Walk-in InvoiceItem (product)", () =>
+            prisma.invoiceItem.deleteMany({ where: { productId: product.id } })],
+        ["Walk-in Invoice (product)", () =>
+            prisma.invoice.deleteMany({ where: { items: { some: { productId: product.id } } } })],
         ["PaymentAllocation (customer invoices)", () =>
             prisma.paymentAllocation.deleteMany({ where: { invoice: { customerId: customer.id } } })],
         ["CustomerLedger", () => prisma.customerLedger.deleteMany({ where: { customerId: customer.id } })],
@@ -919,6 +929,48 @@ async function criticalBugProbes(testEntities) {
         log("[BUG-008] CASH sale with unpaid balanceDue is rejected", "FAIL", "Allowed CASH sale with unpaid balance due");
     } catch (err) {
         log("[BUG-008] CASH sale with unpaid balanceDue is rejected", "PASS", err.message);
+    }
+
+    // Walk-in Customer Return Type CREDIT check
+    try {
+        const walkInInv = await invoiceModel.createInvoice({
+            customerId: null,
+            saleType: "CASH",
+            invoiceDate: new Date(),
+            items: [{ productId: product.id, quantity: 2 }],
+            paidAmount: 300,
+            creditApplied: 0,
+            createdById: adminUser.id,
+        });
+
+        try {
+            await salesReturnModel.createSalesReturn({
+                invoiceId: walkInInv.id,
+                reason: "Walk-in return CREDIT test",
+                refundType: "CREDIT",
+                items: [{ productId: product.id, quantity: 1 }],
+                createdById: adminUser.id,
+            });
+            log("Walk-in customer CREDIT refund is rejected", "FAIL", "Allowed Walk-in customer to have CREDIT refund");
+        } catch (err) {
+            log("Walk-in customer CREDIT refund is rejected", "PASS", err.message);
+        }
+
+        try {
+            await salesReturnModel.createSalesReturn({
+                invoiceId: walkInInv.id,
+                reason: "Walk-in return CASH test",
+                refundType: "CASH",
+                items: [{ productId: product.id, quantity: 1 }],
+                createdById: adminUser.id,
+            });
+            log("Walk-in customer CASH refund is allowed", "PASS");
+        } catch (err) {
+            log("Walk-in customer CASH refund is allowed", "FAIL", err.message);
+        }
+
+    } catch (err) {
+        log("Walk-in customer return tests", "WARN", `Could not complete: ${err.message}`);
     }
 }
 

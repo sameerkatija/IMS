@@ -5,7 +5,7 @@ const invoiceModel = require("../models/invoice-model");
  */
 async function createInvoice(req, res) {
   try {
-    const { customerId, salesmanId, saleType, invoiceDate, discount, paidAmount, creditApplied, description, items } = req.body;
+    const { customerId, salesmanId, saleType, invoiceDate, discount, transportDiscount, paidAmount, creditApplied, description, items } = req.body;
     const createdById = req.user.id;
 
     const invoice = await invoiceModel.createInvoice({
@@ -14,6 +14,7 @@ async function createInvoice(req, res) {
       saleType,
       invoiceDate,
       discount,
+      transportDiscount: transportDiscount !== undefined ? Number(transportDiscount) : 0,
       paidAmount,
       creditApplied,
       description,

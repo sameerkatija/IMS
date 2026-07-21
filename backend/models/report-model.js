@@ -42,6 +42,7 @@ async function getDashboardMetrics() {
     monthReturnsAgg,
     monthCashRefundAgg,
     monthPurchaseDiscountAgg,
+    monthPaymentRefundAgg,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
@@ -116,12 +117,19 @@ async function getDashboardMetrics() {
       _sum: { discount: true },
       where: { purchaseDate: { gte: monthStart, lt: monthEnd } },
     }),
+    prisma.customerPayment.aggregate({
+      _sum: { amount: true },
+      where: {
+        paymentDate: { gte: monthStart, lt: monthEnd },
+        paymentType: "CASH_REFUND",
+      },
+    }),
   ]);
 
   const todaySalesReturn = Number(todayReturnsAgg._sum.totalAmount || 0);
   const weekSalesReturn = Number(weekReturnsAgg._sum.totalAmount || 0);
   const monthSalesReturn = Number(monthReturnsAgg._sum.totalAmount || 0);
-  const monthCashRefund = Number(monthCashRefundAgg._sum.totalAmount || 0);
+  const monthCashRefund = Number(monthCashRefundAgg._sum.totalAmount || 0) + Number(monthPaymentRefundAgg._sum.amount || 0);
   const monthPurchaseDiscount = Number(monthPurchaseDiscountAgg._sum.discount || 0);
 
   const todaySales = Math.max(0, Number(todaySalesAgg._sum.total || 0) - todaySalesReturn);

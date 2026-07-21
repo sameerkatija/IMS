@@ -133,7 +133,7 @@ async function phase1_InvoiceInvariants() {
   // balanceDue check
   let balanceDriftCount = 0;
   for (const inv of invoices) {
-    const computed = Number(inv.total) - Number(inv.paidAmount) - Number(inv.creditApplied || 0) - Number(inv.returnedAmount || 0);
+    const computed = Number(inv.total) - Number(inv.transportDiscount || 0) - Number(inv.paidAmount) - Number(inv.creditApplied || 0) - Number(inv.returnedAmount || 0);
     const stored = Number(inv.balanceDue);
     if (Math.abs(computed - stored) > 0.02) {
       balanceDriftCount++;
@@ -141,9 +141,9 @@ async function phase1_InvoiceInvariants() {
     }
   }
   if (balanceDriftCount === 0) {
-    log("Invoice.balanceDue == total - paid - credit - returned", "PASS", `Checked ${invoices.length} invoices`);
+    log("Invoice.balanceDue == total - transportDiscount - paid - credit - returned", "PASS", `Checked ${invoices.length} invoices`);
   } else {
-    log("Invoice.balanceDue == total - paid - credit - returned", "FAIL", `${balanceDriftCount} invoices with balanceDue drift`);
+    log("Invoice.balanceDue == total - transportDiscount - paid - credit - returned", "FAIL", `${balanceDriftCount} invoices with balanceDue drift`);
   }
 }
 

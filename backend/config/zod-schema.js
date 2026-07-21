@@ -434,6 +434,11 @@ exports.createInvoiceSchema = z.object({
     .nonnegative({ message: "Discount must be a non-negative number." })
     .default(0)
     .optional(),
+  transportDiscount: z
+    .coerce.number({ invalid_type_error: "Transport discount must be a number." })
+    .nonnegative({ message: "Transport discount must be a non-negative number." })
+    .default(0)
+    .optional(),
   paidAmount: z
     .coerce.number({ invalid_type_error: "Paid amount must be a number." })
     .nonnegative({ message: "Paid amount must be a non-negative number." })
@@ -586,6 +591,20 @@ exports.createSupplierPaymentSchema = z.object({
   description: z
     .string()
     .trim()
+    .optional()
+    .nullable(),
+  allocations: z
+    .array(
+      z.object({
+        purchaseId: z
+          .coerce.number({ required_error: "Purchase ID is required.", invalid_type_error: "Purchase ID must be a number." })
+          .int({ message: "Purchase ID must be an integer." })
+          .positive({ message: "Purchase ID must be a positive integer." }),
+        amountAllocated: z
+          .coerce.number({ required_error: "Amount allocated is required.", invalid_type_error: "Amount allocated must be a number." })
+          .positive({ message: "Amount allocated must be a positive number." }),
+      })
+    )
     .optional()
     .nullable(),
 });

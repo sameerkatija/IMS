@@ -37,7 +37,6 @@ const Returns = () => {
   const [loadedInvoice, setLoadedInvoice] = useState(null);
   const [salesReturnItems, setSalesReturnItems] = useState([]); // [{productId, name, sku, maxQty, quantity, unitPrice}]
   const [salesReturnReason, setSalesReturnReason] = useState("");
-  const [salesReturnRefundType, setSalesReturnRefundType] = useState("CREDIT");
 
 
   // Tab 3: Purchase Returns (Supplier)
@@ -260,7 +259,7 @@ const Returns = () => {
         customerId: loadedInvoice.customerId || null,
         invoiceId: loadedInvoice.id,
         reason: salesReturnReason || null,
-        refundType: salesReturnRefundType,
+        refundType: loadedInvoice.customerId ? "CREDIT" : "CASH",
         items: itemsToReturn.map(it => ({
           productId: it.productId,
           quantity: it.quantity,
@@ -277,7 +276,6 @@ const Returns = () => {
         setSelectedInvoiceId("");
         setSalesReturnItems([]);
         setSalesReturnReason("");
-        setSalesReturnRefundType("CREDIT");
       }
     } catch (err) {
       console.error(err);
@@ -378,31 +376,28 @@ const Returns = () => {
         <nav className="flex space-x-8 text-sm font-medium">
           <button
             onClick={() => { setActiveTab("sales"); }}
-            className={`py-4 border-b-2 px-1 transition-all ${
-              activeTab === "sales"
+            className={`py-4 border-b-2 px-1 transition-all ${activeTab === "sales"
                 ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
+              }`}
           >
             Sales Returns
           </button>
           <button
             onClick={() => { setActiveTab("purchase"); }}
-            className={`py-4 border-b-2 px-1 transition-all ${
-              activeTab === "purchase"
+            className={`py-4 border-b-2 px-1 transition-all ${activeTab === "purchase"
                 ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
+              }`}
           >
             Purchase Returns
           </button>
           <button
             onClick={() => { setActiveTab("adjustments"); }}
-            className={`py-4 border-b-2 px-1 transition-all ${
-              activeTab === "adjustments"
+            className={`py-4 border-b-2 px-1 transition-all ${activeTab === "adjustments"
                 ? "border-sky-600 text-sky-600 dark:text-sky-400 font-bold"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
+              }`}
           >
             Manual Adjustments
           </button>
@@ -470,11 +465,10 @@ const Returns = () => {
                             {mv.product?.name}
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded-full border ${
-                              mv.type === "IN"
+                            <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded-full border ${mv.type === "IN"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/40"
                                 : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900/40"
-                            }`}>
+                              }`}>
                               {mv.type === "IN" ? "Stock In (+)" : "Stock Out (-)"}
                             </span>
                           </td>
@@ -754,14 +748,19 @@ const Returns = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Refund Method</label>
-                          <select
-                            value={salesReturnRefundType}
-                            onChange={(e) => setSalesReturnRefundType(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm font-semibold"
-                          >
-                            <option value="CREDIT">Store Credit (Ledger credit)</option>
-                            <option value="CASH">Cash Refund (Paid back immediately)</option>
-                          </select>
+                          <div className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl text-sm font-semibold flex items-center">
+                            {loadedInvoice.customerId ? (
+                              <span className="text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                Store Credit
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Cash Refund
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -786,7 +785,6 @@ const Returns = () => {
                       setSelectedInvoiceId("");
                       setSalesReturnItems([]);
                       setSalesReturnReason("");
-                      setSalesReturnRefundType("CREDIT");
                     }}
                     className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors"
                   >

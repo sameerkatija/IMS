@@ -10,6 +10,7 @@ const Suppliers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isActiveFilter, setIsActiveFilter] = useState("all");
+  const [balanceFilter, setBalanceFilter] = useState("all");
   const [toast, setToast] = useState(null);
   
   // Pagination
@@ -38,6 +39,7 @@ const Suppliers = () => {
       let queryParams = `?page=${page}&limit=${limit}`;
       if (search.trim()) queryParams += `&search=${encodeURIComponent(search)}`;
       if (isActiveFilter !== "all") queryParams += `&isActive=${isActiveFilter === "active"}`;
+      if (balanceFilter !== "all") queryParams += `&balanceFilter=${balanceFilter}`;
       
       const response = await api.get(`/api/supplier${queryParams}`);
       if (response.data && response.data.type === "success") {
@@ -54,7 +56,7 @@ const Suppliers = () => {
 
   useEffect(() => {
     fetchSuppliers();
-  }, [page, search, isActiveFilter]);
+  }, [page, search, isActiveFilter, balanceFilter]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -211,6 +213,20 @@ const Suppliers = () => {
             <option value="all">All Statuses</option>
             <option value="active">Active Only</option>
             <option value="inactive">Inactive Only</option>
+          </select>
+        </div>
+
+        {/* Balance filter */}
+        <div className="w-full md:w-56 flex items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2">
+          <select
+            value={balanceFilter}
+            onChange={(e) => { setBalanceFilter(e.target.value); setPage(1); }}
+            className="w-full text-sm bg-transparent border-none outline-none focus:ring-0 text-slate-700 dark:text-slate-300 font-medium"
+          >
+            <option value="all">All Balances</option>
+            <option value="weOwe">We Owe Them (Owed by Us)</option>
+            <option value="oweUs">Owes Us (Supplier owes us)</option>
+            <option value="zero">Zero/Settled Balance</option>
           </select>
         </div>
       </div>

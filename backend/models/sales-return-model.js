@@ -35,6 +35,9 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
       throw error;
     }
 
+    // Auto-derive refundType: registered customer returns are always CREDIT; walk-in customer returns are always CASH.
+    const derivedRefundType = invoice.customerId ? "CREDIT" : "CASH";
+
     // Map original invoice items
     const soldQtyMap = {};
     const unitPriceMap = {};
@@ -99,7 +102,7 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         invoiceId,
         returnDate: returnDate ? new Date(returnDate) : new Date(),
         totalAmount,
-        refundType,
+        refundType: derivedRefundType,
         reason,
         createdById,
       },
@@ -157,8 +160,10 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
     }
 
     // 6. Record customer ledger entries if totalAmount > 0 and customer exists
+    // Note: Transport discount spent during invoice creation is an incurred transport expense
+    // and is NOT reversed or clawed back during full or partial sales returns.
     if (totalAmount > 0 && invoice.customerId) {
-      // 6a. Record customer credit ledger entry (goods return reduces what they owe us)
+      // Record customer credit ledger entry (goods return reduces what they owe us)
       await ledgerModel.recordCustomerLedgerEntry(
         {
           customerId: invoice.customerId,
@@ -171,8 +176,8 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         tx
       );
 
-      // 6b. If refundType is CASH, immediately offset the credit with a debit entry (represents the cash paid back to customer)
-      if (refundType === "CASH") {
+      // If refundType is CASH, immediately offset the credit with a debit entry (represents cash paid back to customer)
+      if (derivedRefundType === "CASH" && invoice.status === "PAID") {
         await ledgerModel.recordCustomerLedgerEntry(
           {
             customerId: invoice.customerId,
@@ -187,36 +192,35 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
       }
     }
 
-    // 7. Update invoice balanceDue and status to reflect the return.
-    //    Applies to ALL refund types (CREDIT store-credit and CASH payout):
-    //    - CREDIT: the credit note directly reduces what the customer owes on the invoice.
-    //    - CASH:   we pay the customer back in cash, which equally cancels that portion of
-    //              the receivable — the invoice should no longer show that debt.
-    //    If the return amount exceeds balanceDue (e.g., invoice was already paid in full),
-    //    the excess remains in Customer.balance as a negative (store credit) from the ledger
-    //    entry above — the invoice is left at PAID / balanceDue = 0 unchanged.
-    if (invoice.customerId && refundType === "CREDIT") {
-      const appliedToInvoice = Math.min(totalAmount, Number(invoice.balanceDue));
-      if (appliedToInvoice > 0) {
-        const newBalanceDue = Math.max(0, Number(invoice.balanceDue) - appliedToInvoice);
-        const newStatus =
-          newBalanceDue <= 0
-            ? "PAID"
-            : newBalanceDue < Number(invoice.total)
+    // 7. Update invoice balanceDue, returnedAmount, and status to reflect the return.
+    if (totalAmount > 0) {
+      const currentBalanceDue = Number(invoice.balanceDue || 0);
+      const appliedToInvoice = Math.min(totalAmount, currentBalanceDue);
+      const newBalanceDue = Math.max(0, Math.round((currentBalanceDue - appliedToInvoice) * 100) / 100);
+
+      const updatedReturnedAmount = Math.round((Number(invoice.returnedAmount || 0) + totalAmount) * 100) / 100;
+      const totalSettled =
+        Number(invoice.paidAmount || 0) +
+        Number(invoice.creditApplied || 0) +
+        updatedReturnedAmount;
+      const invoiceTotal = Number(invoice.total || 0);
+      const transportDiscount = Number(invoice.transportDiscount || 0);
+
+      const newStatus =
+        totalSettled + transportDiscount >= invoiceTotal
+          ? "PAID"
+          : totalSettled > 0
             ? "PARTIALLY_PAID"
             : "UNPAID";
 
-        await tx.invoice.update({
-          where: { id: invoiceId },
-          data: {
-            balanceDue: newBalanceDue,
-            status: newStatus,
-            returnedAmount: { increment: appliedToInvoice }
-          },
-        });
-      }
-      // appliedToInvoice === 0 means invoice was already fully paid.
-      // The ledger entries already handle the excess credit/cash obligation correctly.
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          balanceDue: newBalanceDue,
+          status: newStatus,
+          returnedAmount: updatedReturnedAmount,
+        },
+      });
     }
 
     return salesReturn;
