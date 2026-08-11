@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
+const glModel = require("./gl-model");
+const systemModel = require("./system-model");
 const { generateDocNumber } = require("../config/doc-number");
 
 /**
@@ -8,8 +10,11 @@ const { generateDocNumber } = require("../config/doc-number");
  * Validates that returned quantities do not exceed original purchase quantities (minus already returned quantities).
  * Updates stock (decrementing) and writes a debit entry in the supplier ledger.
  */
-async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason, items, createdById }) {
+async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason, items, refundType, createdById }) {
   return prisma.$transaction(async (tx) => {
+    // Check if accounting period for returnDate is closed
+    await systemModel.verifyPeriodNotClosed(returnDate, tx);
+
     // 1. Verify supplier exists
     const supplier = await tx.supplier.findUnique({
       where: { id: supplierId },
@@ -17,6 +22,13 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
     if (!supplier) {
       const error = new Error("Supplier not found.");
       error.statusCode = 404;
+      throw error;
+    }
+
+    // MED-02 FIX: Validate supplier is active (mirrors the check in createPurchase)
+    if (!supplier.isActive) {
+      const error = new Error("Cannot process a return for an inactive supplier.");
+      error.statusCode = 400;
       throw error;
     }
 
@@ -124,41 +136,17 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
         },
       });
 
-      // Reverse the WAC for returned units BEFORE adjustStock decrements stockQuantity.
-      // Formula: newWAC = (currentPool − returnedCost) / remainingQty
-      // where currentPool = currentStock × currentWAC  and  returnedCost = returnedQty × returnUnitCost
-      // If all units are gone, WAC resets to 0.
-      // Lock product row to prevent concurrent WAC calculation race conditions
-      const products = await tx.$queryRaw`
+      // Phase 12 Invariant: Purchase returns NEVER re-derive WAC for remaining stock.
+      // Remaining stock stays at its current pool WAC. The stock OUT movement decrements
+      // stockQuantity at current pool WAC without modifying per-unit WAC of remaining stock.
+      // Lock product row to prevent concurrency race conditions.
+      await tx.$queryRaw`
         SELECT "stockQuantity", "weightedAvgCost" FROM "Product" 
         WHERE id = ${item.productId} 
         FOR UPDATE
       `;
-      const productSnap = products[0];
-      const currentQty = Number(productSnap.stockQuantity);
-      const currentWAC = Number(productSnap.weightedAvgCost);
-      const remainingQty = currentQty - item.quantity;
 
-      let newWAC;
-      if (remainingQty <= 0) {
-        newWAC = 0;
-      } else {
-        const poolValue = currentQty * currentWAC;
-        const removedValue = item.quantity * item.unitCost; // net unit cost at time of original purchase
-        const netPoolValue = poolValue - removedValue;
-        if (netPoolValue <= 0) {
-          newWAC = currentWAC;
-        } else {
-          newWAC = netPoolValue / remainingQty;
-        }
-      }
-
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { weightedAvgCost: Math.round(newWAC * 10000) / 10000 },
-      });
-
-      // Adjust stock (decrementing) — happens AFTER WAC reversal so the formula above has correct qty
+      // Adjust stock OUT (decrementing physical stock quantity)
       await stockModel.adjustStock(
         {
           productId: item.productId,
@@ -188,27 +176,64 @@ async function createPurchaseReturn({ supplierId, purchaseId, returnDate, reason
       );
     }
 
-    // 8. Update original Purchase balanceDue and status to reflect the returned amount.
-    //    A return reduces the liability we have toward the supplier, so it reduces balanceDue.
-    //    This mirrors exactly how Invoice.balanceDue is updated when a sales return is processed.
+    // 8. Update original Purchase balanceDue, returnedAmount, and status to reflect the returned amount.
+    const currentReturnedAmount = Number(purchase.returnedAmount || 0);
+    const updatedReturnedAmount = Math.round((currentReturnedAmount + totalAmount) * 100) / 100;
     const appliedToPurchase = Math.min(totalAmount, Number(purchase.balanceDue));
-    const newBalanceDue = Math.max(0, Number(purchase.balanceDue) - appliedToPurchase);
+    const newBalanceDue = Math.max(0, Math.round((Number(purchase.balanceDue) - appliedToPurchase) * 100) / 100);
+    const totalSettled = Number(purchase.paidAmount || 0) + Number(purchase.creditApplied || 0) + updatedReturnedAmount;
+    const purchaseTotal = Number(purchase.total || 0);
     const newStatus =
-      newBalanceDue <= 0
+      totalSettled >= purchaseTotal
         ? "PAID"
-        : newBalanceDue < Number(purchase.total)
+        : totalSettled > 0
         ? "PARTIALLY_PAID"
         : "UNPAID";
 
     await tx.purchase.update({
       where: { id: purchaseId },
       data: {
+        returnedAmount: updatedReturnedAmount,
         balanceDue: newBalanceDue,
         status: newStatus,
-        returnedAmount: { increment: appliedToPurchase }
       },
     });
 
+    // 9. Post General Ledger (GL) Journal Entries
+    let inventoryValueAtPoolWAC = 0;
+    for (const item of validatedItems) {
+      const productSnap = await tx.product.findUnique({ where: { id: item.productId } });
+      const currentWAC = Number(productSnap?.weightedAvgCost || 0);
+      inventoryValueAtPoolWAC += item.quantity * currentWAC;
+    }
+    inventoryValueAtPoolWAC = Math.round(inventoryValueAtPoolWAC * 100) / 100;
+
+    const variance = Math.round((totalAmount - inventoryValueAtPoolWAC) * 100) / 100;
+    // LOW-07 FIX: Use the explicitly passed refundType if provided;
+    // otherwise fall back to balance-based auto-detection.
+    // isCashRefund = true when caller specifies "CASH", or when purchase has no remaining balance.
+    const isCashRefund = (refundType === "CASH") || (!refundType && Number(purchase.balanceDue) === 0);
+    const glDebitCode = isCashRefund ? "1000" : "2000";
+    const glDebitDesc = isCashRefund
+      ? `Cash refund received for Purchase Return ${returnNo}`
+      : `AP reduction for Purchase Return ${returnNo}`;
+
+    const glEntries = [
+      { code: glDebitCode, debit: totalAmount, credit: 0, description: glDebitDesc },
+      { code: "1300", debit: 0, credit: inventoryValueAtPoolWAC, description: `Inventory stock OUT at pool WAC for Purchase Return ${returnNo}` },
+    ];
+
+    if (variance > 0) {
+      glEntries.push({ code: "5100", debit: 0, credit: variance, description: `Purchase Return Variance gain for ${returnNo}` });
+    } else if (variance < 0) {
+      glEntries.push({ code: "5100", debit: Math.abs(variance), credit: 0, description: `Purchase Return Variance loss for ${returnNo}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "PURCHASE_RETURN", referenceId: purchaseReturn.id, createdById, entryDate: purchaseReturn.returnDate },
+      tx
+    );
 
     return purchaseReturn;
   });

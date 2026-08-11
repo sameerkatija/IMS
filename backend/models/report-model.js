@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const glModel = require("./gl-model");
 
 /**
  * Aggregates high-level metrics for the dashboard view.
@@ -142,25 +143,12 @@ async function getDashboardMetrics() {
   const lowStockCount = lowStockRes[0]?.count ?? 0;
   const monthExpenses = Number(monthExpensesAgg._sum.amount || 0);
 
-  // Compute returned COGS for gross profit calculation using historical return cost
-  const monthSalesReturns = await prisma.salesReturn.findMany({
-    where: { returnDate: { gte: monthStart, lt: monthEnd } },
-    include: {
-      items: true
-    }
-  });
-
-  let monthReturnedCOGS = 0;
-  for (const ret of monthSalesReturns) {
-    for (const item of ret.items) {
-      monthReturnedCOGS += item.quantity * Number(item.costPriceAtSale);
-    }
-  }
-
-  const monthCOGS = Number(monthCOGSRes[0]?.cogs || 0);
-  const monthGrossProfit = monthSales - (monthCOGS - monthReturnedCOGS);
-  // Purchase discounts are already baked into costPriceAtSale (lower COGS). Do NOT add them again.
-  const monthNetProfit = monthGrossProfit - monthExpenses;
+  // Fetch immutable General Ledger P&L metrics for exact reconciliation
+  const monthPL = await glModel.getGLProfitAndLoss({ from: monthStart, to: monthEnd });
+  const monthGrossProfit = monthPL.grossProfit;
+  const monthNetProfit = monthPL.netProfit;
+  const monthCOGS = monthPL.cogs;
+  const monthReturnedCOGS = 0;
 
   // Resolve top products details with sales returns deducted
   const netRevenueMap = {};
@@ -179,20 +167,27 @@ async function getDashboardMetrics() {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  const topProducts = [];
-  for (const item of sortedProductRevenues) {
-    const product = await prisma.product.findUnique({
-      where: { id: item.productId },
-      select: { id: true, name: true, sku: true, size: true },
-    });
-    topProducts.push({
+  // PERF-01 FIX: Replace N+1 findUnique loop with a single batched findMany.
+  // Previously each of the top 5 products triggered a separate DB query.
+  const topProductIds = sortedProductRevenues.map((item) => item.productId);
+  const topProductList = await prisma.product.findMany({
+    where: { id: { in: topProductIds } },
+    select: { id: true, name: true, sku: true, size: true },
+  });
+  const topProductMap = {};
+  for (const p of topProductList) {
+    topProductMap[p.id] = p;
+  }
+  const topProducts = sortedProductRevenues.map((item) => {
+    const product = topProductMap[item.productId];
+    return {
       productId: item.productId,
       name: product?.name || "Unknown",
       sku: product?.sku || "",
       size: product?.size || null,
       revenue: item.revenue,
-    });
-  }
+    };
+  });
 
   return {
     todaySales,
@@ -422,8 +417,11 @@ async function customerLedgerReport() {
     let bucketOver = 0;
 
     for (const inv of customer.invoices) {
-      const diffTime = Math.abs(now - new Date(inv.invoiceDate));
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // LOW-04 FIX: Removed Math.abs — future-dated invoices should fall into the 0-30
+      // day bucket (not be treated as if they were old). Math.abs caused a post-dated invoice
+      // for e.g. next week to appear with a positive age, inflating older aging buckets.
+      const diffTime = now - new Date(inv.invoiceDate);
+      const diffDays = diffTime > 0 ? Math.ceil(diffTime / (1000 * 60 * 60 * 24)) : 0;
       const due = Number(inv.balanceDue);
 
       if (diffDays <= 30) {
@@ -468,56 +466,11 @@ async function supplierLedgerReport() {
 }
 
 /**
- * Calculates gross profit using snapshotted cost prices.
+ * Calculates gross profit using immutable General Ledger journal entries.
  */
 async function profitReport(from, to) {
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-
-  // Fetch sales returns in the period to calculate returned revenue and returned COGS
-  const salesReturns = await prisma.salesReturn.findMany({
-    where: { returnDate: { gte: fromDate, lte: toDate } },
-    include: {
-      invoice: {
-        include: {
-          items: true
-        }
-      },
-      items: true
-    }
-  });
-
-  let returnedRevenue = 0;
-  let returnedCOGS = 0;
-  for (const ret of salesReturns) {
-    returnedRevenue += Number(ret.totalAmount || 0);
-    const invItems = ret.invoice?.items || [];
-    for (const item of ret.items) {
-      const matchedInvItem = invItems.find(ii => ii.productId === item.productId);
-      const originalCost = matchedInvItem ? Number(matchedInvItem.costPriceAtSale) : 0;
-      returnedCOGS += item.quantity * originalCost;
-    }
-  }
-
-
-  const [totalSalesAgg, cogsRes] = await Promise.all([
-    prisma.invoice.aggregate({
-      _sum: { total: true },
-      where: { invoiceDate: { gte: fromDate, lte: toDate } },
-    }),
-    prisma.$queryRaw`
-      SELECT COALESCE(SUM(ii."costPriceAtSale" * ii.quantity), 0)::numeric AS cogs
-      FROM "InvoiceItem" ii
-      JOIN "Invoice" i ON ii."invoiceId" = i.id
-      WHERE i."invoiceDate" >= ${fromDate} AND i."invoiceDate" <= ${toDate}
-    `
-  ]);
-
-  const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
-  const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
-  const grossProfit = sales - cogs;
-
-  return grossProfit;
+  const pl = await glModel.getGLProfitAndLoss({ from, to });
+  return pl.grossProfit;
 }
 
 async function expenseReport(from, to) {
@@ -554,68 +507,19 @@ async function expenseReport(from, to) {
 }
 
 /**
- * Evaluates net profit margins (gross profit minus total expenses).
+ * Evaluates net profit margins directly from frozen General Ledger journal entries.
  */
 async function netProfitReport(from, to) {
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-
-  // Fetch sales returns in the period to calculate returned revenue and returned COGS
-  const salesReturns = await prisma.salesReturn.findMany({
-    where: { returnDate: { gte: fromDate, lte: toDate } },
-    include: {
-      invoice: {
-        include: {
-          items: true
-        }
-      },
-      items: true
-    }
-  });
-
-  let returnedRevenue = 0;
-  let returnedCOGS = 0;
-  for (const ret of salesReturns) {
-    returnedRevenue += Number(ret.totalAmount || 0);
-    const invItems = ret.invoice?.items || [];
-    for (const item of ret.items) {
-      const matchedInvItem = invItems.find(ii => ii.productId === item.productId);
-      const originalCost = matchedInvItem ? Number(matchedInvItem.costPriceAtSale) : 0;
-      returnedCOGS += item.quantity * originalCost;
-    }
-  }
-
-
-  const [totalSalesAgg, cogsRes, expensesAgg] = await Promise.all([
-    prisma.invoice.aggregate({
-      _sum: { total: true },
-      where: { invoiceDate: { gte: fromDate, lte: toDate } },
-    }),
-    prisma.$queryRaw`
-      SELECT COALESCE(SUM(ii."costPriceAtSale" * ii.quantity), 0)::numeric AS cogs
-      FROM "InvoiceItem" ii
-      JOIN "Invoice" i ON ii."invoiceId" = i.id
-      WHERE i."invoiceDate" >= ${fromDate} AND i."invoiceDate" <= ${toDate}
-    `,
-    prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: {
-        expenseDate: { gte: fromDate, lte: toDate },
-      },
-    }),
-  ]);
-
-  const sales = Number(totalSalesAgg._sum.total || 0) - returnedRevenue;
-  const cogs = Number(cogsRes[0]?.cogs || 0) - returnedCOGS;
-  const grossProfit = sales - cogs;
-  const totalExpenses = Number(expensesAgg._sum.amount || 0);
-  // Purchase discounts are already baked into costPriceAtSale (lower COGS). Do NOT add them again.
-  const netProfit = grossProfit - totalExpenses;
-
+  const pl = await glModel.getGLProfitAndLoss({ from, to });
   return {
-    grossProfit,
-    totalExpenses,
-    netProfit,
+    grossProfit: pl.grossProfit,
+    totalExpenses: pl.totalExpenses,
+    netProfit: pl.netProfit,
+    salesRevenue: pl.salesRevenue,
+    salesReturns: pl.salesReturns,
+    netSales: pl.netSales,
+    cogs: pl.cogs,
+    purchaseReturnVariance: pl.purchaseReturnVariance,
   };
 }
 

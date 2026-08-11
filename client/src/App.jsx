@@ -16,7 +16,9 @@ import Salesmen from "./pages/Salesmen";
 import Expenses from "./pages/Expenses";
 import Returns from "./pages/Returns";
 import Reports from "./pages/Reports";
+import GeneralLedger from "./pages/GeneralLedger";
 import AdminUsers from "./pages/AdminUsers";
+import AccountingPeriods from "./pages/AccountingPeriods";
 import ForgotPassword from "./pages/ForgotPassword";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -187,13 +189,29 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/general-ledger"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <GeneralLedger />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Admin User Management */}
+          {/* Admin User Management & Accounting Period Locks */}
           <Route
             path="/admin/users"
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/accounting-periods"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AccountingPeriods />
               </ProtectedRoute>
             }
           />

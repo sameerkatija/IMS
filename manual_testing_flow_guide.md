@@ -161,3 +161,54 @@ This flow is used when a customer pays down their overall balance, or when we pa
   * For the UI event: Verify that a `.sql` file is downloaded to your browser with a name like `backup-YYYY-MM-DD-HH-MM-SS.sql`.
   * For the CLI script: Verify that a corresponding `.sql` backup file is generated inside the [backend/backups/](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/backups/) directory.
   * Inspect the file content: it must contain `TRUNCATE TABLE` statements, `INSERT INTO` statements with all your database records, constraint override tags (`SET session_replication_role = 'replica'`), and sequence resetting commands (`setval(pg_get_serial_sequence(...))`).
+
+---
+
+## 9. General Ledger & Enterprise Accounting Adjustments (Phase 12 Testing)
+
+This testing flow validates the double-entry accounting engine, frozen historical P&L, and enterprise financial adjustments.
+
+### A. Trial Balance & Double-Entry Equality
+* **Trigger Route:** `GET /api/gl/trial-balance`
+* **Verification Check:**
+  * Verify that `isBalanced` is `true`.
+  * Confirm that `totalDebit` equals `totalCredit` across all 13 Chart of Accounts.
+
+### B. Frozen General Ledger Profit & Loss
+* **Trigger Route:** `GET /api/gl/profit-loss?from=YYYY-MM-DD&to=YYYY-MM-DD`
+* **Verification Check:**
+  * Confirm that Net Sales (`Sales Revenue 4000` - `Sales Returns 4100`), COGS (`5000`), Purchase Return Variance (`5100`), Operating Expenses (`6000`), and Net Operating Profit are calculated directly from frozen `GLJournalEntry` rows.
+  * *Test Invariant:* Perform a purchase after an invoice sale. Verify that yesterday's P&L and COGS figures do not alter when today's purchase modifies `Product.weightedAvgCost`.
+
+### C. Customer Deposit / Prepayment (`POST /api/gl/customer-deposit`)
+* **What it does:** Records advance cash received from a customer before an invoice is issued.
+* **Transactional Flow:**
+  1. Creates a `CustomerDeposit` row.
+  2. Posts a credit entry to `CustomerLedger` (reducing what they owe / creating store credit).
+  3. Posts double-entry GL journal: Debit `1000 Cash` / Credit `2100 Customer Deposits Liability`.
+* **Verification Check:** Customer balance decreases (or becomes negative), and Cash GL asset increases.
+
+### D. Credit Note (`POST /api/gl/credit-note`)
+* **What it does:** Issues a customer rebate or goodwill allowance.
+* **Transactional Flow:**
+  1. Creates a `CreditNote` row.
+  2. Posts a credit entry to `CustomerLedger`.
+  3. Posts double-entry GL journal: Debit `4100 Sales Returns & Allowances` / Credit `1100 Accounts Receivable`.
+* **Verification Check:** AR balance drops and Sales Returns allowance increases.
+
+### E. Debit Note (`POST /api/gl/debit-note`)
+* **What it does:** Issues a claim or price reduction request to a supplier.
+* **Transactional Flow:**
+  1. Creates a `DebitNote` row.
+  2. Posts a debit entry to `SupplierLedger`.
+  3. Posts double-entry GL journal: Debit `2000 Accounts Payable` / Credit `5100 Purchase Return Variance / Allowance`.
+* **Verification Check:** AP balance drops and Supplier Allowance gain increases.
+
+### F. Bad Debt Write-Off (`POST /api/gl/bad-debt-writeoff`)
+* **What it does:** Writes off an uncollectible customer invoice balance.
+* **Transactional Flow:**
+  1. Creates a `BadDebtWriteOff` row.
+  2. Posts a credit entry to `CustomerLedger` to clear the outstanding balance.
+  3. Updates `Invoice.documentStatus = 'VOIDED'` and `Invoice.balanceDue = 0`.
+  4. Posts double-entry GL journal: Debit `6100 Bad Debt Expense` / Credit `1100 Accounts Receivable`.
+* **Verification Check:** Outstanding invoice balance becomes 0, document status updates to `VOIDED`, and Bad Debt Expense increases.

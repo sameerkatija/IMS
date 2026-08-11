@@ -21,7 +21,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor: automatically redirect on 401 Unauthorized
+// Response interceptor: automatically redirect on 401 Unauthorized & detect Period Closed 400 errors
 api.interceptors.response.use(
   (response) => {
     return response;
@@ -32,6 +32,18 @@ api.interceptors.response.use(
       if (!window.location.pathname.endsWith("/login")) {
         window.location.href = "/login";
       }
+    } else if (
+      error.response &&
+      error.response.status === 400 &&
+      error.response.data &&
+      typeof error.response.data.error === "string" &&
+      error.response.data.error.includes("is closed")
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("period-closed-error", {
+          detail: { message: error.response.data.error },
+        })
+      );
     }
     return Promise.reject(error);
   }

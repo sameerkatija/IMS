@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const glModel = require("./gl-model");
 
 /**
  * Adjusts the stock quantity of a product inside an optional or existing transaction.
@@ -102,7 +103,7 @@ async function createAdjustment({ productId, quantity, reason, description, crea
       });
 
       const unitCost = Number(product.weightedAvgCost) || 0;
-      const expenseAmount = unitCost * Math.abs(quantity); // Loss is logged as a positive expense amount
+      const expenseAmount = Math.round(unitCost * Math.abs(quantity) * 100) / 100; // Loss is logged as a positive expense amount
 
       await tx.expense.create({
         data: {
@@ -112,6 +113,17 @@ async function createAdjustment({ productId, quantity, reason, description, crea
           createdById,
         }
       });
+
+      if (expenseAmount > 0) {
+        await glModel.postGLJournalEntries(
+          [
+            { code: "5200", debit: expenseAmount, credit: 0, description: `Inventory shrinkage loss for ${product.name} (${reason})` },
+            { code: "1300", debit: 0, credit: expenseAmount, description: `Inventory asset reduction for ${product.name} (${reason})` },
+          ],
+          { referenceType: "ADJUSTMENT", referenceId: adjustment.id, createdById },
+          tx
+        );
+      }
     }
 
     return adjustment;

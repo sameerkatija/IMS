@@ -56,5 +56,6 @@ router.use('/report', require('./report-route'));
 
 router.use('/expense', require('./expense-route'));
 router.use('/expense-category', require('./expense-category-route'));
+router.use('/gl', require('./gl-route'));
 
 module.exports = router;

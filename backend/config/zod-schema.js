@@ -485,12 +485,13 @@ exports.createSalesReturnSchema = z.object({
     .positive({ message: "Customer ID must be a positive integer." })
     .optional()
     .nullable(),
+  // LOW-05 FIX: invoiceId is required for sales returns (the model immediately rejects
+  // requests without one). Enforcing it here produces a clear schema-level error message
+  // instead of a cryptic "Invoice ID is required" from inside the transaction.
   invoiceId: z
-    .coerce.number({ invalid_type_error: "Invoice ID must be a number." })
+    .coerce.number({ required_error: "Invoice ID is required.", invalid_type_error: "Invoice ID must be a number." })
     .int({ message: "Invoice ID must be an integer." })
-    .positive({ message: "Invoice ID must be a positive integer." })
-    .optional()
-    .nullable(),
+    .positive({ message: "Invoice ID must be a positive integer." }),
   refundType: z
     .enum(["CREDIT", "CASH"], {
       errorMap: () => ({ message: "Refund type must be either CREDIT or CASH." })

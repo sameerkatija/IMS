@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const ledgerModel = require("./ledger-model");
+const glModel = require("./gl-model");
 
 /**
  * Records a customer payment atomically.
@@ -48,16 +49,8 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
         throw error;
       }
     } else {
-      const customerBalance = Number(customer.balance);
-      if (customerBalance <= 0) {
-        const error = new Error("No payment allowed if customer does not owe anything.");
-        error.statusCode = 400;
-        throw error;
-      }
-      if (amount > customerBalance) {
-        const error = new Error(
-          `Payment amount (${amount}) cannot exceed customer overall outstanding balance (${customerBalance}).`
-        );
+      if (amount <= 0) {
+        const error = new Error("Payment amount must be positive.");
         error.statusCode = 400;
         throw error;
       }
@@ -146,7 +139,17 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
       });
     }
 
-    // 5. Post entry in CustomerLedger
+    // 4.5. Record CustomerDeposit for any unallocated payment amount
+    const unallocatedAmount = Math.round((amount - sumAllocated) * 100) / 100;
+    if (unallocatedAmount > 0 && !isCreditApplied) {
+      await tx.customerDeposit.create({
+        data: {
+          customerId,
+          amount: unallocatedAmount,
+          appliedAmount: 0,
+        },
+      });
+    }
     // For cash payments: post a CREDIT that reduces what the customer owes us.
     // For credit applications: post a DEBIT that consumes the stored credit
     // (brings Customer.balance back toward 0 from negative). Without this,
@@ -179,6 +182,22 @@ async function recordCustomerPayment({ customerId, invoiceId, allocations = [], 
         tx
       );
     }
+
+    // Post GL Journal Entries
+    const glEntries = [];
+    if (!isCreditApplied) {
+      glEntries.push({ code: "1000", debit: amount, credit: 0, description: `Cash received from Customer Payment #${payment.id}` });
+      glEntries.push({ code: "1100", debit: 0, credit: amount, description: `AR reduction from Customer Payment #${payment.id}` });
+    } else {
+      glEntries.push({ code: "2100", debit: amount, credit: 0, description: `Customer deposit credit application #${payment.id}` });
+      glEntries.push({ code: "1100", debit: 0, credit: amount, description: `AR reduction from Store Credit #${payment.id}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "PAYMENT", referenceId: payment.id, createdById, entryDate: payment.paymentDate },
+      tx
+    );
 
     return payment;
   });
@@ -256,6 +275,20 @@ async function refundCustomerCreditBalance({ customerId, amount, refundDate, des
         referenceId: payment.id,
         description: description || `Cash refund of store credit (Payment ID: ${payment.id})`,
       },
+      tx
+    );
+
+    // MED-05 FIX: Post GL Journal Entries for the cash outflow.
+    // Previously, the cash refund was invisible in the General Ledger, causing Cash (1000)
+    // to be overstated by the refund amount.
+    // DR 2100 Customer Deposits Liability (reduces our deposit obligation)
+    // CR 1000 Cash (cash is leaving the business)
+    await glModel.postGLJournalEntries(
+      [
+        { code: "2100", debit: amount, credit: 0, description: `Customer deposit liability refunded — Payment ID: ${payment.id}` },
+        { code: "1000", debit: 0, credit: amount, description: `Cash refund of store credit — Payment ID: ${payment.id}` },
+      ],
+      { referenceType: "PAYMENT", referenceId: payment.id, createdById, entryDate: payment.paymentDate },
       tx
     );
 
@@ -428,6 +461,22 @@ async function recordSupplierPayment({ supplierId, purchaseId, allocations = [],
         tx
       );
     }
+
+    // Post GL Journal Entries
+    const glEntries = [];
+    if (!isCreditApplied) {
+      glEntries.push({ code: "2000", debit: amount, credit: 0, description: `AP reduction from Supplier Payment #${payment.id}` });
+      glEntries.push({ code: "1000", debit: 0, credit: amount, description: `Cash paid for Supplier Payment #${payment.id}` });
+    } else {
+      glEntries.push({ code: "2000", debit: amount, credit: 0, description: `AP reduction from Vendor Credit #${payment.id}` });
+      glEntries.push({ code: "1400", debit: 0, credit: amount, description: `Vendor advance applied #${payment.id}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "PAYMENT", referenceId: payment.id, createdById, entryDate: payment.paymentDate },
+      tx
+    );
 
     return payment;
   });
@@ -858,6 +907,20 @@ async function applyStoreCreditToInvoice({ customerId, invoiceId, amount, create
       tx
     );
 
+    // 7. Post GL Journal Entries: Debit Customer Deposits Liability (2100), Credit Accounts Receivable (1100)
+    // HIGH-02 FIX: Use referenceType "CREDIT_APPLICATION" to distinguish these entries
+    // from cash payment GL entries which also use referenceId = invoiceId.
+    // Without this, getGLJournalEntries({ referenceType: "PAYMENT", referenceId: invoiceId })
+    // would return a mixed set of cash payments and store-credit applications.
+    await glModel.postGLJournalEntries(
+      [
+        { code: "2100", debit: roundedAmount, credit: 0, description: `Store credit applied to Invoice ${invoice.invoiceNo}` },
+        { code: "1100", debit: 0, credit: roundedAmount, description: `AR reduction via store credit for Invoice ${invoice.invoiceNo}` },
+      ],
+      { referenceType: "CREDIT_APPLICATION", referenceId: invoiceId, createdById },
+      tx
+    );
+
     return {
       invoiceId,
       invoiceNo: invoice.invoiceNo,
@@ -980,6 +1043,16 @@ async function applyStoreCreditToPurchase({ supplierId, purchaseId, amount, crea
         referenceId: purchaseId,
         description: `Supplier credit applied to Purchase ${purchase.purchaseNo}`,
       },
+      tx
+    );
+
+    // 6. Post GL Journal Entries: Debit Accounts Payable (2000), Credit Vendor Advances Asset (1400)
+    await glModel.postGLJournalEntries(
+      [
+        { code: "2000", debit: roundedAmount, credit: 0, description: `AP reduction via vendor credit for Purchase ${purchase.purchaseNo}` },
+        { code: "1400", debit: 0, credit: roundedAmount, description: `Vendor advance applied to Purchase ${purchase.purchaseNo}` },
+      ],
+      { referenceType: "PAYMENT", referenceId: purchaseId, createdById },
       tx
     );
 

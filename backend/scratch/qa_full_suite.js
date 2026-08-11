@@ -53,6 +53,8 @@ function header(title) {
   console.log(B("═".repeat(60)));
 }
 
+const { seedGLAccounts } = require("../config/seed-gl-accounts");
+
 async function cleanDB() {
   console.log("Cleaning database tables for reproducible test run...");
   const tables = await prisma.$queryRaw`
@@ -63,6 +65,7 @@ async function cleanDB() {
     const tableNames = tables.map((t) => `"${t.tablename}"`).join(", ");
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE;`);
   }
+  await seedGLAccounts(prisma);
 }
 
 async function runQASuite() {

@@ -36,13 +36,18 @@ stockModel.adjustStock({ productId, quantity, type: 'IN'|'OUT', referenceType, r
 * **Audit Trail:** Every stock change automatically registers a corresponding row in the `StockMovement` table within the same transaction block.
 
 ### B. Customer and Supplier Ledgers
-Ledger records are running records of account balances. These are updated atomically when purchases, sales, returns, or payments occur.
-* **Prisma Enum Limitations:** Due to schema constraints, the `ReferenceType` enum is limited to `[PURCHASE, INVOICE, SALES_RETURN, PURCHASE_RETURN, ADJUSTMENT]`. Therefore:
-  * Customer payments must log `referenceType: 'INVOICE'`.
-  * Supplier payments must log `referenceType: 'PURCHASE'`.
+Ledger records are running records of account balances. These are updated atomically when purchases, sales, returns, payments, or adjustments occur.
+* **Prisma Enum Extension (Phase 12)**: The `ReferenceType` enum covers `[PURCHASE, INVOICE, SALES_RETURN, PURCHASE_RETURN, ADJUSTMENT, PAYMENT, CORRECTION, DEPOSIT, WRITE_OFF]`.
 * **Atomic Balance Snapshotting:** Ledger entries atomically update target customer/supplier balances using database increments (`{ increment: delta }`) and snapshot that specific running balance onto the ledger row.
 
-### C. Sequential Document Numbering
+### C. General Ledger & Double-Entry Accounting Engine (Phase 12)
+All transactional models auto-post double-entry journal records (`GLJournalEntry`) in the same `prisma.$transaction` block:
+* **`gl-model.js`**: Exposes `postGLJournalEntries(entries, metadata, tx)` with automatic debit/credit balancing verification against the 13 Chart of Accounts.
+* **`gl-entity-model.js`**: Handles `CustomerDeposit` (prepayments), `CreditNote` (customer rebates), `DebitNote` (supplier claims), and `BadDebtWriteOff` (uncollectible debt handling).
+* **Frozen P&L Invariant**: Financial reports query `GLJournalEntry` directly. Historical P&L is 100% frozen against future WAC updates or price changes.
+* **Purchase Return WAC Variance**: Physical stock OUT is valued at current pool WAC, AP reduction at agreed vendor refund rate, and difference is posted to GL `5100 Purchase Return Variance`.
+
+### D. Sequential Document Numbering
 The helper `generateDocNumber(tx, prefixKey, prefixString)` in [doc-number.js](file:///c:/Users/SameerKatija/Documents/code/SameerTraderzFullStack/backend/config/doc-number.js) guarantees sequential, zero-padded document numbers using atomic Prisma transaction queries:
 * **Invoices:** `INV-000001`, `INV-000002`
 * **Sales Returns:** `SR-000001`, `SR-000002`
@@ -95,6 +100,15 @@ All endpoints support standard listings with pagination (`?page=1&limit=10`), te
 * `GET /api/sales-target/salesman/:id/achievement?month=YYYY-MM` - Evaluates targets vs actual sales (net of returns) and progress percentages.
 * `/api/expense` - Record and list categorized business expenses.
 
+### General Ledger & Adjustments (Phase 12)
+* `GET /api/gl/trial-balance` - General Ledger Trial Balance (`isBalanced`, total debits, total credits).
+* `GET /api/gl/profit-loss` - Immutable GL Profit & Loss (Net sales, COGS, Purchase return variance, expenses, net profit).
+* `GET /api/gl/journal-entries` - Double-entry GL journal audit trail (`?referenceType=...&page=1&limit=50`).
+* `POST /api/gl/customer-deposit` - Record customer advance prepayment (`{ customerId, amount, description }`).
+* `POST /api/gl/credit-note` - Issue credit note rebate (`{ customerId, invoiceId, amount, reason }`).
+* `POST /api/gl/debit-note` - Issue debit note claim (`{ supplierId, purchaseId, amount, reason }`).
+* `POST /api/gl/bad-debt-writeoff` - Write off uncollectible debt (`{ invoiceId, reason }`).
+
 ### Analytical Reports (Phase 9)
 * `GET /api/report/dashboard` - Dashboard stats (Today/Week/Month sales, receivables, payables, monthly expenses, net profits, low stock counts).
 * `GET /api/report/sales` - Grouped daily sales.
@@ -104,9 +118,9 @@ All endpoints support standard listings with pagination (`?page=1&limit=10`), te
 * `GET /api/report/low-stock` - Products below reorder limits.
 * `GET /api/report/customer-ledger` - Customer ledger balances split into aging buckets (`0-30 days`, `31-60 days`, `60+ days`).
 * `GET /api/report/supplier-ledger` - Supplier balance ledger list.
-* `GET /api/report/profit` - Period profitability checks.
+* `GET /api/report/profit` - Period profitability checks (powered by GL engine).
 * `GET /api/report/expense` - Categorized expense aggregates.
-* `GET /api/report/net-profit` - Period profit margins.
+* `GET /api/report/net-profit` - Period profit margins (powered by GL engine).
 
 ---
 

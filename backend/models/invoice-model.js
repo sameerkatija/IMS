@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
+const glModel = require("./gl-model");
+const systemModel = require("./system-model");
 const { generateDocNumber } = require("../config/doc-number");
 
 /**
@@ -10,6 +12,9 @@ const { generateDocNumber } = require("../config/doc-number");
  */
 async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoiceDate, discount = 0, transportDiscount = 0, paidAmount = 0, creditApplied = 0, description, items, createdById }) {
   return prisma.$transaction(async (tx) => {
+    // Check if accounting period for invoiceDate is closed
+    await systemModel.verifyPeriodNotClosed(invoiceDate, tx);
+
     // 1. Validate customer exists (if customerId is provided) and check credit limits
     if (customerId) {
       const customers = await tx.$queryRaw`
@@ -61,6 +66,17 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
     }
 
     // 3. Loop and validate items, calculate subtotal and item discounts first
+    // LOW-01: Detect duplicate productIds before any DB work
+    const seenProductIds = new Set();
+    for (const item of items) {
+      if (seenProductIds.has(item.productId)) {
+        const error = new Error(`Duplicate product ID ${item.productId} in items. Each product can only appear once per invoice.`);
+        error.statusCode = 400;
+        throw error;
+      }
+      seenProductIds.add(item.productId);
+    }
+
     let subtotal = 0;
     let totalCost = 0;
     let totalItemDiscounts = 0;
@@ -103,6 +119,13 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       throw error;
     }
 
+    // MED-03: Prevent negative netPayable caused by an oversized transport discount
+    if (transportDiscount > total) {
+      const error = new Error(`Transport discount (Rs. ${transportDiscount.toFixed(2)}) cannot exceed the invoice total (Rs. ${total.toFixed(2)}).`);
+      error.statusCode = 400;
+      throw error;
+    }
+
     const netPayable = total - transportDiscount;
 
     if (paidAmount < 0) {
@@ -124,18 +147,25 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
     }
 
     const validatedItems = [];
-    for (const item of items) {
+    let allocatedDiscountSum = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       const product = productsMap[item.productId];
       const unitPrice = item.unitPrice !== undefined && item.unitPrice !== null ? item.unitPrice : Number(product.sellingPrice);
       const itemDiscount = Number(item.discount || 0);
       const itemSubtotal = item.quantity * unitPrice;
 
-      let proportionalDiscountShare = 0;
+      let proportionalHeaderDiscountShare = 0;
       if (subtotal > 0 && discount > 0) {
-        proportionalDiscountShare = (itemSubtotal / subtotal) * discount;
+        if (i === items.length - 1) {
+          proportionalHeaderDiscountShare = Math.round((discount - allocatedDiscountSum) * 100) / 100;
+        } else {
+          proportionalHeaderDiscountShare = Math.round(((itemSubtotal / subtotal) * discount) * 100) / 100;
+          allocatedDiscountSum += proportionalHeaderDiscountShare;
+        }
       }
 
-      const itemTotalPrice = Math.round((itemSubtotal - itemDiscount - proportionalDiscountShare) * 100) / 100;
+      const itemTotalPrice = Math.round((itemSubtotal - itemDiscount - proportionalHeaderDiscountShare) * 100) / 100;
 
       validatedItems.push({
         productId: item.productId,
@@ -167,6 +197,10 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
       error.statusCode = 400;
       throw error;
     }
+
+    // MED-04: Credit limit enforcement is pending a schema migration to add
+    // Customer.creditLimit column. Skipped until the column exists in the database.
+
 
     // 5. Generate unique sequential invoice number
     const invoiceNo = await generateDocNumber(tx, "invoice", "INV");
@@ -245,59 +279,89 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
 
 
     // 9. Post ledger entries (only for credit sales or when store credit is applied)
-    if (customerId && (saleType === "CREDIT" || creditApplied > 0)) {
-      const ledgerDebit = total;
-      if (ledgerDebit > 0) {
+    if (customerId) {
+      if (saleType === "CREDIT") {
+        const ledgerDebit = total;
+        if (ledgerDebit > 0) {
+          await ledgerModel.recordCustomerLedgerEntry(
+            {
+              customerId,
+              debit: ledgerDebit,
+              credit: 0,
+              referenceType: "INVOICE",
+              referenceId: invoice.id,
+              description: `Credit sale for Invoice ${invoiceNo}`,
+            },
+            tx
+          );
+        }
+
+        if (transportDiscount > 0) {
+          await ledgerModel.recordCustomerLedgerEntry(
+            {
+              customerId,
+              debit: 0,
+              credit: transportDiscount,
+              referenceType: "INVOICE",
+              referenceId: invoice.id,
+              description: `Transport discount allowance for Invoice ${invoiceNo}`,
+            },
+            tx
+          );
+        }
+
+        if (paidAmount > 0) {
+          await ledgerModel.recordCustomerLedgerEntry(
+            {
+              customerId,
+              debit: 0,
+              credit: paidAmount,
+              referenceType: "PAYMENT",
+              referenceId: upfrontPayment ? upfrontPayment.id : invoice.id,
+              description: `Cash payment upfront for Invoice ${invoiceNo}`,
+            },
+            tx
+          );
+        }
+
+        // CRIT-01 FIX: Do NOT post a separate ledger entry for creditApplied on CREDIT sales.
+        // The `debit: total` entry above already moves Customer.balance to reflect the full
+        // invoice amount. Adding a debit for creditApplied would overstate what the customer
+        // owes by 2× creditApplied. The credit is consumed implicitly: the customer's prior
+        // negative balance (advance/deposit) offsets the new invoice debit naturally.
+        // Example: balance=-500, invoice total=1000, creditApplied=500
+        //   After sale debit: -500 + 1000 = +500 (= balanceDue) ✓ No extra entry needed.
+      } else if (saleType === "CASH" && creditApplied > 0) {
+        // Cash sale with store credit applied: debit CustomerLedger to consume the credit.
+        // For CASH sales, no AR debit is posted, so we need this entry to bring the
+        // customer's negative (credit) balance back toward zero.
         await ledgerModel.recordCustomerLedgerEntry(
           {
             customerId,
-            debit: ledgerDebit,
+            debit: creditApplied,
             credit: 0,
             referenceType: "INVOICE",
             referenceId: invoice.id,
-            description: `Credit sale for Invoice ${invoiceNo}`,
+            description: `Store credit applied to Cash Invoice ${invoiceNo}`,
           },
           tx
         );
       }
-
-      if (transportDiscount > 0) {
-        await ledgerModel.recordCustomerLedgerEntry(
-          {
-            customerId,
-            debit: 0,
-            credit: transportDiscount,
-            referenceType: "INVOICE",
-            referenceId: invoice.id,
-            description: `Transport discount allowance for Invoice ${invoiceNo}`,
-          },
-          tx
-        );
-      }
-
-      if (paidAmount > 0) {
-        await ledgerModel.recordCustomerLedgerEntry(
-          {
-            customerId,
-            debit: 0,
-            credit: paidAmount,
-            referenceType: "PAYMENT",
-            referenceId: upfrontPayment ? upfrontPayment.id : invoice.id,
-            description: `Cash payment upfront for Invoice ${invoiceNo}`,
-          },
-          tx
-        );
-      }
-
     }
 
-    // 10. Record Transport Discount as a general expense
+    // 10. Record Transport Discount as a business expense.
+    // Transport discount is a real cash advance paid upfront to the transporter
+    // at the time the invoice is raised. It must appear in the Expense report.
+    // The GL 6000 entry (posted below) covers the financial/accounting view,
+    // while the Expense table record covers the operational expense listing.
+    // These two representations serve different purposes and are never summed
+    // together into a single total, so there is no double-counting.
     if (transportDiscount > 0) {
-      const expenseCategoryName = "transport discount";
+      const expenseCategoryName = "Transport";
       const expCategory = await tx.expenseCategory.upsert({
         where: { name: expenseCategoryName },
         update: {},
-        create: { name: expenseCategoryName, isActive: true }
+        create: { name: expenseCategoryName },
       });
 
       await tx.expense.create({
@@ -305,13 +369,55 @@ async function createInvoice({ customerId, salesmanId, saleType = "CASH", invoic
           categoryId: expCategory.id,
           amount: transportDiscount,
           expenseDate: invoice.invoiceDate,
-          description: `Transport discount for Invoice ${invoiceNo}`,
+          description: `Transport expense for Invoice ${invoiceNo}`,
           createdById,
-        }
+        },
       });
     }
 
 
+    // 11. Post General Ledger (GL) Journal Entries
+    const totalCOGS = Math.round(validatedItems.reduce((acc, item) => acc + item.quantity * item.costPriceAtSale, 0) * 100) / 100;
+    const glEntries = [];
+
+    // Revenue & Asset/Settlement Recognition
+    if (saleType === "CREDIT") {
+      const arAmount = Math.round((netPayable - paidAmount - creditApplied) * 100) / 100;
+      if (arAmount > 0) {
+        glEntries.push({ code: "1100", debit: arAmount, credit: 0, description: `AR for Invoice ${invoiceNo}` });
+      }
+      if (paidAmount > 0) {
+        glEntries.push({ code: "1000", debit: paidAmount, credit: 0, description: `Cash received upfront for Invoice ${invoiceNo}` });
+      }
+      if (creditApplied > 0) {
+        glEntries.push({ code: "2100", debit: creditApplied, credit: 0, description: `Store credit applied to Invoice ${invoiceNo}` });
+      }
+    } else {
+      const cashReceived = Math.round((netPayable - creditApplied) * 100) / 100;
+      if (cashReceived > 0) {
+        glEntries.push({ code: "1000", debit: cashReceived, credit: 0, description: `Cash for Invoice ${invoiceNo}` });
+      }
+      if (creditApplied > 0) {
+        glEntries.push({ code: "2100", debit: creditApplied, credit: 0, description: `Store credit applied to Invoice ${invoiceNo}` });
+      }
+    }
+    glEntries.push({ code: "4000", debit: 0, credit: total, description: `Sales Revenue for Invoice ${invoiceNo}` });
+
+    if (transportDiscount > 0) {
+      glEntries.push({ code: "6000", debit: transportDiscount, credit: 0, description: `Transport discount expense for Invoice ${invoiceNo}` });
+    }
+
+    // Inventory & COGS Recognition
+    if (totalCOGS > 0) {
+      glEntries.push({ code: "5000", debit: totalCOGS, credit: 0, description: `COGS for Invoice ${invoiceNo}` });
+      glEntries.push({ code: "1300", debit: 0, credit: totalCOGS, description: `Inventory asset reduction for Invoice ${invoiceNo}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "INVOICE", referenceId: invoice.id, createdById, entryDate: invoice.invoiceDate },
+      tx
+    );
 
     return invoice;
   });

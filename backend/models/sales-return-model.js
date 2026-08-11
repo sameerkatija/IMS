@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
+const glModel = require("./gl-model");
+const systemModel = require("./system-model");
 const { generateDocNumber } = require("../config/doc-number");
 
 /**
@@ -10,6 +12,9 @@ const { generateDocNumber } = require("../config/doc-number");
  */
 async function createSalesReturn({ customerId, invoiceId, returnDate, reason, items, refundType = "CREDIT", createdById }) {
   return prisma.$transaction(async (tx) => {
+    // Check if accounting period for returnDate is closed
+    await systemModel.verifyPeriodNotClosed(returnDate, tx);
+
     // 1. Verify invoice exists
     if (!invoiceId) {
       const error = new Error("Invoice ID is required to process a sales return.");
@@ -80,7 +85,20 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
       }
 
       const netUnitPrice = Number(invItem.totalPrice) / soldQty;
-      const itemTotal = item.quantity * netUnitPrice;
+      let itemTotal;
+      if (item.quantity === remaining) {
+        let alreadyReturnedValue = 0;
+        for (const ret of invoice.salesReturns) {
+          for (const retItem of ret.items) {
+            if (retItem.productId === item.productId) {
+              alreadyReturnedValue += Number(retItem.totalPrice);
+            }
+          }
+        }
+        itemTotal = Math.round((Number(invItem.totalPrice) - alreadyReturnedValue) * 100) / 100;
+      } else {
+        itemTotal = Math.round(item.quantity * netUnitPrice * 100) / 100;
+      }
       totalAmount += itemTotal;
 
       validatedItems.push({
@@ -88,7 +106,21 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         quantity: item.quantity,
         unitPrice: netUnitPrice,
         totalPrice: itemTotal,
+        costPriceAtSale: Number(invItem.costPriceAtSale || 0),
       });
+    }
+
+    // CRIT-04 FIX: Cap the total return value so it never exceeds the original invoice total
+    // (minus already returned amounts). Quantity checks prevent returning more units, but
+    // floating-point accumulation could create an impossible total amount.
+    totalAmount = Math.round(totalAmount * 100) / 100;
+    const maxReturnableValue = Math.round((Number(invoice.total || 0) - Number(invoice.returnedAmount || 0)) * 100) / 100;
+    if (totalAmount > maxReturnableValue + 0.01) {
+      const error = new Error(
+        `Return value (Rs. ${totalAmount.toFixed(2)}) exceeds remaining returnable invoice value (Rs. ${maxReturnableValue.toFixed(2)}).`
+      );
+      error.statusCode = 400;
+      throw error;
     }
 
     // 3. Generate unique sequential return number (SR-XXXXXX)
@@ -123,28 +155,7 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         },
       });
 
-      // Lock product row to prevent concurrency errors
-      const products = await tx.$queryRaw`
-        SELECT "stockQuantity", "weightedAvgCost" FROM "Product" 
-        WHERE id = ${item.productId} 
-        FOR UPDATE
-      `;
-      const current = products[0];
-      const existingQty = Number(current.stockQuantity);
-      const existingWAC = Number(current.weightedAvgCost);
-      const totalQty = existingQty + item.quantity;
-
-      const newWAC =
-        totalQty > 0
-          ? (existingQty * existingWAC + item.quantity * costPriceAtSale) / totalQty
-          : costPriceAtSale;
-
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { weightedAvgCost: Math.round(newWAC * 10000) / 10000 },
-      });
-
-      // Adjust stock (incrementing stock back in)
+      // Adjust stock (incrementing stock back in at current pool WAC)
       await stockModel.adjustStock(
         {
           productId: item.productId,
@@ -222,6 +233,40 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         },
       });
     }
+
+    // 8. Post General Ledger (GL) Journal Entries
+    const totalReturnedCOGS = Math.round(validatedItems.reduce((acc, item) => acc + item.quantity * item.costPriceAtSale, 0) * 100) / 100;
+    const glEntries = [
+      { code: "4100", debit: totalAmount, credit: 0, description: `Sales Return ${returnNo} for Invoice ${invoice.invoiceNo}` },
+    ];
+
+    if (invoice.customerId && derivedRefundType === "CREDIT") {
+      glEntries.push({ code: "1100", debit: 0, credit: totalAmount, description: `AR credit for Sales Return ${returnNo}` });
+    } else if (!invoice.customerId) {
+      // HIGH-03 FIX: Walk-in (cash) returns — only post cash outflow to GL when the
+      // invoice was actually paid. Posting CR 1000 for an unpaid walk-in invoice creates
+      // a phantom cash outflow (cash was never received, so there is nothing to refund).
+      const cashRefundable = Math.min(totalAmount, Number(invoice.paidAmount || 0));
+      if (cashRefundable > 0) {
+        glEntries.push({ code: "1000", debit: 0, credit: cashRefundable, description: `Cash refund for Sales Return ${returnNo}` });
+      }
+      // If cashRefundable = 0 (invoice was unpaid), no cash GL entry is posted.
+      // Stock is restored and COGS reversed, but no cash changes hands.
+    } else {
+      // Fallback: registered customer with CASH refund type (edge case)
+      glEntries.push({ code: "1000", debit: 0, credit: totalAmount, description: `Cash refund for Sales Return ${returnNo}` });
+    }
+
+    if (totalReturnedCOGS > 0) {
+      glEntries.push({ code: "1300", debit: totalReturnedCOGS, credit: 0, description: `Stock asset recovery for Sales Return ${returnNo}` });
+      glEntries.push({ code: "5000", debit: 0, credit: totalReturnedCOGS, description: `COGS reversal for Sales Return ${returnNo}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "SALES_RETURN", referenceId: salesReturn.id, createdById, entryDate: salesReturn.returnDate },
+      tx
+    );
 
     return salesReturn;
 

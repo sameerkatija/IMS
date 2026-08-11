@@ -192,3 +192,27 @@ backend/
   - Added a premium **Backup Database** button on the client dashboard header for logged-in Administrators to trigger downloads of database dumps.
 - **Local Deployment Configuration:**
   - Established a setup procedure for deploying the Node/Express backend and React/Vite frontend locally on a single machine running PostgreSQL.
+
+---
+
+## Phase 12 — GL-Grade Accounting Redesign & Enterprise Adjustments `[COMPLETED]`
+
+- **Double-Entry General Ledger Engine (`GLAccount` & `GLJournalEntry`)**:
+  - Implemented a complete double-entry General Ledger system in `gl-model.js` seeded with 13 foundational Chart of Accounts (`1000 Cash`, `1100 AR`, `1300 Inventory Asset`, `1400 Vendor Advances`, `2000 AP`, `2100 Customer Deposits`, `4000 Sales Revenue`, `4100 Sales Returns`, `5000 COGS`, `5100 Purchase Return Variance`, `5200 Inventory Shrinkage`, `6000 Operating Expenses`, `6100 Bad Debt Expense`).
+  - Automated GL journal posting inside `prisma.$transaction` across all transactional models (`invoice-model.js`, `purchase-model.js`, `sales-return-model.js`, `purchase-return-model.js`, `payment-model.js`, `expense-model.js`).
+- **Frozen P&L Invariant**:
+  - P&L and financial reports (`report-model.js`) query immutable GL journal entries directly. Changing today's WAC or selling price never changes historical P&L figures.
+- **Purchase Return WAC Variance Math (IFRS/GAAP Standard)**:
+  - Purchase returns no longer re-derive WAC for remaining stock. Physical stock OUT is valued at current pool WAC, supplier balance reduction at agreed refund rate, and the difference is posted to GL `5100 Purchase Return Variance`.
+- **4-Decimal Cost & WAC Precision**:
+  - Upgraded cost/WAC fields (`Product.costPrice`, `Product.weightedAvgCost`, `PurchaseItem.unitCost`, `PurchaseReturnItem.unitCost`, `InvoiceItem.costPriceAtSale`, `SalesReturnItem.costPriceAtSale`) to `@db.Decimal(12, 4)`.
+- **Header Discount Line Allocation**:
+  - Implemented exact integer remainder allocation for multi-item header discounts on the $N^{\text{th}}$ line item.
+- **Document Status & Immutability**:
+  - Added `DocumentStatus` enum (`DRAFT`, `POSTED`, `VOIDED`) to `Invoice` and `Purchase`.
+- **First-Class Business Entities**:
+  - Created `CustomerDeposit` (prepayments), `CreditNote` (customer rebates), `DebitNote` (supplier claims), and `BadDebtWriteOff` (uncollectible debt handling) in `gl-entity-model.js`.
+- **Historical GL Backfill**:
+  - Created idempotent script `scratch/backfill_gl_history.js` to backfill frozen GL journal entries for all historical transactions using original transaction dates.
+- **React Frontend Integration**:
+  - Built `GeneralLedger.jsx` page on the client featuring Trial Balance verification, GL Profit & Loss, Journal Audit Trail search, Customer Deposit posting, Credit/Debit Note forms, and Bad Debt Write-Off workflows.

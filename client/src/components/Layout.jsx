@@ -10,11 +10,13 @@ import {
   ShoppingCart,
   Receipt,
   CreditCard,
+  BookOpen,
   UserCheck,
   TrendingDown,
   RotateCcw,
   BarChart3,
   KeyRound,
+  Lock,
   LogOut,
   Menu,
   X,
@@ -43,6 +45,18 @@ const Layout = ({ children }) => {
     }
   }, [darkMode]);
 
+  const [periodClosedError, setPeriodClosedError] = useState(null);
+
+  useEffect(() => {
+    const handlePeriodClosedError = (event) => {
+      setPeriodClosedError(event.detail?.message || "Transaction Blocked: Accounting period is closed.");
+    };
+    window.addEventListener("period-closed-error", handlePeriodClosedError);
+    return () => {
+      window.removeEventListener("period-closed-error", handlePeriodClosedError);
+    };
+  }, []);
+
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
   const navigationItems = [
@@ -57,8 +71,10 @@ const Layout = ({ children }) => {
     { name: "Salesmen & Targets", path: "/salesmen", icon: UserCheck, roles: ["ADMIN", "STAFF"] },
     { name: "Expenses", path: "/expenses", icon: TrendingDown, roles: ["ADMIN", "STAFF"] },
     { name: "Returns & Stock", path: "/returns", icon: RotateCcw, roles: ["ADMIN", "STAFF"] },
+    { name: "General Ledger", path: "/general-ledger", icon: BookOpen, roles: ["ADMIN"] },
     { name: "Reports Center", path: "/reports", icon: BarChart3, roles: ["ADMIN", "STAFF"] },
-    { name: "User Management", path: "/admin/users", icon: KeyRound, roles: ["ADMIN"] } // Admin-only route!
+    { name: "Period Locks", path: "/admin/accounting-periods", icon: Lock, roles: ["ADMIN"] },
+    { name: "User Management", path: "/admin/users", icon: KeyRound, roles: ["ADMIN"] }
   ];
 
   const visibleItems = navigationItems.filter(item => item.roles.includes(user?.role));
@@ -139,7 +155,21 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Content Box */}
-        <main className="flex-1 overflow-y-auto px-6 py-8 relative">
+        <main className="flex-1 overflow-y-auto px-6 py-8 relative space-y-4">
+          {periodClosedError && (
+            <div className="p-4 bg-rose-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-bounce-once">
+              <div className="flex items-center space-x-3">
+                <span className="text-xl">🔒</span>
+                <div className="font-semibold text-sm">{periodClosedError}</div>
+              </div>
+              <button
+                onClick={() => setPeriodClosedError(null)}
+                className="px-3 py-1 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-lg transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {children}
         </main>
       </div>

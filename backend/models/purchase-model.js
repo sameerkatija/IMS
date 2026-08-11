@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
+const glModel = require("./gl-model");
+const systemModel = require("./system-model");
 const { generateDocNumber } = require("../config/doc-number");
 
 /**
@@ -9,6 +11,9 @@ const { generateDocNumber } = require("../config/doc-number");
  */
 async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmount = 0, creditApplied = 0, description, items, createdById }) {
   return prisma.$transaction(async (tx) => {
+    // Check if accounting period for purchaseDate is closed
+    await systemModel.verifyPeriodNotClosed(purchaseDate, tx);
+
     // 1. Verify supplier exists and lock the row
     const suppliers = await tx.$queryRaw`
       SELECT * FROM "Supplier" 
@@ -74,7 +79,11 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
     }
 
     const validatedItems = [];
-    for (const item of items) {
+    // CQ-02 FIX: Use indexed loop to detect last item for rounding correction
+    let allocatedDiscountSum = 0;
+    for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
+      const item = items[itemIdx];
+      const isLastItem = itemIdx === items.length - 1;
       const product = await tx.product.findUnique({
         where: { id: item.productId },
       });
@@ -95,7 +104,13 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
 
       let proportionalDiscountShare = 0;
       if (subtotal > 0 && discount > 0) {
-        proportionalDiscountShare = (itemSubtotal / subtotal) * discount;
+        if (isLastItem) {
+          // CQ-02 FIX: Last item absorbs any residual rounding difference
+          proportionalDiscountShare = Math.round((discount - allocatedDiscountSum) * 100) / 100;
+        } else {
+          proportionalDiscountShare = Math.round(((itemSubtotal / subtotal) * discount) * 100) / 100;
+          allocatedDiscountSum += proportionalDiscountShare;
+        }
       }
 
       const itemTotalCost = Math.round((itemSubtotal - itemDiscount - proportionalDiscountShare) * 100) / 100;
@@ -237,6 +252,33 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       );
     }
 
+    // CRIT-01 FIX: Do NOT post a separate ledger entry for creditApplied on purchases.
+    // The `credit: total` entry above already moves Supplier.balance to reflect the full
+    // purchase amount. Adding a credit for creditApplied would overstate what we owe the
+    // supplier by 2x creditApplied. The vendor advance is consumed implicitly as the supplier's
+    // prior negative balance offsets the new purchase credit naturally.
+
+
+    // 10. Post General Ledger (GL) Journal Entries
+    const apAmount = Math.round((total - paidAmount - creditApplied) * 100) / 100;
+    const glEntries = [
+      { code: "1300", debit: total, credit: 0, description: `Inventory asset received for Purchase ${purchaseNo}` },
+    ];
+    if (paidAmount > 0) {
+      glEntries.push({ code: "1000", debit: 0, credit: paidAmount, description: `Cash paid for Purchase ${purchaseNo}` });
+    }
+    if (creditApplied > 0) {
+      glEntries.push({ code: "1400", debit: 0, credit: creditApplied, description: `Vendor advance applied for Purchase ${purchaseNo}` });
+    }
+    if (apAmount > 0) {
+      glEntries.push({ code: "2000", debit: 0, credit: apAmount, description: `AP recorded for Purchase ${purchaseNo}` });
+    }
+
+    await glModel.postGLJournalEntries(
+      glEntries,
+      { referenceType: "PURCHASE", referenceId: purchase.id, createdById, entryDate: purchase.purchaseDate },
+      tx
+    );
 
     return purchase;
   });
