@@ -1,11 +1,23 @@
 const invoiceModel = require("../models/invoice-model");
 
 /**
- * Handles creation of new sales invoices.
+ * Handles creation of new sales invoices (DRAFT or POSTED).
  */
 async function createInvoice(req, res) {
   try {
-    const { customerId, salesmanId, saleType, invoiceDate, discount, transportDiscount, paidAmount, creditApplied, description, items } = req.body;
+    const {
+      customerId,
+      salesmanId,
+      saleType,
+      invoiceDate,
+      discount,
+      transportDiscount,
+      paidAmount,
+      creditApplied,
+      documentStatus,
+      description,
+      items,
+    } = req.body;
     const createdById = req.user.id;
 
     const invoice = await invoiceModel.createInvoice({
@@ -17,6 +29,7 @@ async function createInvoice(req, res) {
       transportDiscount: transportDiscount !== undefined ? Number(transportDiscount) : 0,
       paidAmount,
       creditApplied,
+      documentStatus: documentStatus || "POSTED",
       description,
       items,
       createdById,
@@ -24,7 +37,7 @@ async function createInvoice(req, res) {
 
     return res.status(201).json({
       type: "success",
-      message: "Invoice created successfully",
+      message: documentStatus === "DRAFT" ? "Draft invoice saved successfully." : "Invoice created and confirmed successfully.",
       data: invoice,
     });
   } catch (err) {
@@ -37,7 +50,126 @@ async function createInvoice(req, res) {
 }
 
 /**
- * Lists invoices with pagination and optional filters (customerId, salesmanId, status, saleType, and date ranges).
+ * Updates an existing DRAFT invoice.
+ */
+async function updateInvoice(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({
+        type: "error",
+        message: "Invalid invoice ID.",
+      });
+    }
+
+    const {
+      customerId,
+      salesmanId,
+      saleType,
+      invoiceDate,
+      discount,
+      transportDiscount,
+      paidAmount,
+      creditApplied,
+      documentStatus,
+      description,
+      items,
+    } = req.body;
+    const createdById = req.user.id;
+
+    const invoice = await invoiceModel.updateInvoice(
+      id,
+      {
+        customerId,
+        salesmanId,
+        saleType,
+        invoiceDate,
+        discount,
+        transportDiscount: transportDiscount !== undefined ? Number(transportDiscount) : 0,
+        paidAmount,
+        creditApplied,
+        documentStatus,
+        description,
+        items,
+      },
+      createdById
+    );
+
+    return res.status(200).json({
+      type: "success",
+      message: documentStatus === "POSTED" ? "Invoice updated and confirmed successfully." : "Draft invoice updated successfully.",
+      data: invoice,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({
+      type: "error",
+      message: err.message || "Failed to update invoice.",
+    });
+  }
+}
+
+/**
+ * Confirms a DRAFT invoice and makes it immutable.
+ */
+async function confirmInvoice(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({
+        type: "error",
+        message: "Invalid invoice ID.",
+      });
+    }
+
+    const createdById = req.user.id;
+    const invoice = await invoiceModel.confirmInvoice(id, createdById);
+
+    return res.status(200).json({
+      type: "success",
+      message: "Invoice confirmed and locked successfully.",
+      data: invoice,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({
+      type: "error",
+      message: err.message || "Failed to confirm invoice.",
+    });
+  }
+}
+
+/**
+ * Deletes an unconfirmed DRAFT invoice.
+ */
+async function deleteDraftInvoice(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({
+        type: "error",
+        message: "Invalid invoice ID.",
+      });
+    }
+
+    const result = await invoiceModel.deleteDraftInvoice(id);
+
+    return res.status(200).json({
+      type: "success",
+      message: `Draft invoice ${result.invoiceNo} deleted successfully.`,
+      data: result,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({
+      type: "error",
+      message: err.message || "Failed to delete draft invoice.",
+    });
+  }
+}
+
+/**
+ * Lists invoices with pagination and optional filters (customerId, salesmanId, status, documentStatus, saleType, and date ranges).
  */
 async function listInvoices(req, res) {
   try {
@@ -56,8 +188,18 @@ async function listInvoices(req, res) {
     if (req.query.status) {
       where.status = req.query.status;
     }
+    if (req.query.documentStatus) {
+      where.documentStatus = req.query.documentStatus;
+    }
     if (req.query.saleType) {
       where.saleType = req.query.saleType;
+    }
+
+    if (req.query.search) {
+      where.invoiceNo = {
+        contains: req.query.search,
+        mode: "insensitive",
+      };
     }
 
     if (req.query.from || req.query.to) {
@@ -130,6 +272,9 @@ async function getInvoiceById(req, res) {
 
 module.exports = {
   createInvoice,
+  updateInvoice,
+  confirmInvoice,
+  deleteDraftInvoice,
   listInvoices,
   getInvoiceById,
 };

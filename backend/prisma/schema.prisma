@@ -159,6 +159,7 @@ model Product {
 
   category            Category             @relation(fields: [categoryId], references: [id])
   stockMovements      StockMovement[] // full audit trail of every stock change
+  costLayers          InventoryCostLayer[] // FIFO inventory cost layers
   purchaseItems       PurchaseItem[] // every time this was bought in
   invoiceItems        InvoiceItem[] // every time this was sold out
   salesReturnItems    SalesReturnItem[] // every time a customer returned this
@@ -393,6 +394,7 @@ model Purchase {
   supplier  Supplier          @relation(fields: [supplierId], references: [id])
   createdBy User              @relation(fields: [createdById], references: [id])
   items     PurchaseItem[]
+  costLayers  InventoryCostLayer[]        // FIFO cost layers created by this purchase
   returns     PurchaseReturn[]            // returns made against this specific purchase - see PurchaseReturn.purchaseId
   payments    SupplierPayment[]           // payments recorded specifically against this purchase - see SupplierPayment.purchaseId
   allocations SupplierPaymentAllocation[]
@@ -419,6 +421,34 @@ model PurchaseItem {
 
   @@index([purchaseId])
   @@index([productId])
+}
+
+// ================================================================
+// INVENTORY COST LAYERS (FIFO Valuation Engine)
+// ================================================================
+// Implements true First-In, First-Out (FIFO) cost layering for
+// inventory valuation, true gross profit calculation, and tax compliance.
+// Every purchase creates a cost layer with its specific net unit cost.
+// Sales invoices atomically consume from the oldest active layers.
+
+model InventoryCostLayer {
+  id                Int       @id @default(autoincrement())
+  productId         Int
+  purchaseId        Int?      // Nullable for initial balance layers or manual adjustments
+  purchaseItemId    Int?
+  initialQuantity   Int       // Quantity received in this layer (pieces)
+  remainingQuantity Int       // Unconsumed pieces available in this layer
+  unitCost          Decimal   @db.Decimal(12, 4) // Exact purchase cost per piece
+  receivedDate      DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchase Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  @@index([productId, remainingQuantity, receivedDate])
+  @@index([productId, remainingQuantity])
+  @@index([receivedDate])
 }
 
 // Reverses a purchase, partially or fully: stock goes back OUT,

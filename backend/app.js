@@ -37,5 +37,5 @@ if (fs.existsSync(distPath)) {
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-    console.log(`Server is running on port ${env.PORT}`);
+    console.log(`Server is running on port http://localhost:${env.PORT}`);
 });

@@ -3,6 +3,7 @@ const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
 const glModel = require("./gl-model");
 const systemModel = require("./system-model");
+const fifoCostModel = require("./fifo-cost-model");
 const { generateDocNumber } = require("../config/doc-number");
 
 /**
@@ -149,9 +150,9 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
       },
     });
 
-    // 6. Create PurchaseItems, compute WAC, and run stock engine IN movements
+    // 6. Create PurchaseItems, create FIFO cost layers, and run stock engine IN movements
     for (const item of validatedItems) {
-      await tx.purchaseItem.create({
+      const createdItem = await tx.purchaseItem.create({
         data: {
           purchaseId: purchase.id,
           productId: item.productId,
@@ -160,6 +161,19 @@ async function createPurchase({ supplierId, purchaseDate, discount = 0, paidAmou
           totalCost: item.totalCost,
         },
       });
+
+      // Create FIFO inventory cost layer for exact non-blended batch costing
+      await fifoCostModel.createCostLayer(
+        {
+          productId: item.productId,
+          purchaseId: purchase.id,
+          purchaseItemId: createdItem.id,
+          quantity: item.quantity,
+          unitCost: item.netUnitCost,
+          receivedDate: purchase.purchaseDate,
+        },
+        tx
+      );
 
       // Compute new Weighted Average Cost BEFORE adjustStock increments stockQuantity.
       // WAC formula: (existingQty * currentWAC + purchasedQty * netUnitCost) / (existingQty + purchasedQty)

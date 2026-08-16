@@ -449,6 +449,80 @@ exports.createInvoiceSchema = z.object({
     .nonnegative({ message: "Credit applied must be a non-negative number." })
     .default(0)
     .optional(),
+  documentStatus: z.enum(["DRAFT", "POSTED"], {
+    errorMap: () => ({ message: "Document status must be either DRAFT or POSTED." })
+  }).default("POSTED").optional(),
+  description: z
+    .string()
+    .trim()
+    .optional()
+    .nullable(),
+  items: z.array(
+    z.object({
+      productId: z
+        .coerce.number({ required_error: "Product ID is required.", invalid_type_error: "Product ID must be a number." })
+        .int({ message: "Product ID must be an integer." })
+        .positive({ message: "Product ID must be a positive integer." }),
+      quantity: z
+        .coerce.number({ required_error: "Quantity is required.", invalid_type_error: "Quantity must be a number." })
+        .int({ message: "Quantity must be an integer." })
+        .positive({ message: "Quantity must be a positive integer." }),
+      unitPrice: z
+        .coerce.number({ invalid_type_error: "Unit price must be a number." })
+        .nonnegative({ message: "Unit price must be a non-negative number." })
+        .optional()
+        .nullable(),
+      discount: z
+        .coerce.number({ invalid_type_error: "Discount must be a number." })
+        .nonnegative({ message: "Discount must be a non-negative number." })
+        .default(0)
+        .optional(),
+    })
+  ).nonempty({ message: "Invoice must contain at least one item." }),
+});
+
+exports.updateInvoiceSchema = z.object({
+  customerId: z
+    .coerce.number({ invalid_type_error: "Customer ID must be a number." })
+    .int({ message: "Customer ID must be an integer." })
+    .positive({ message: "Customer ID must be a positive integer." })
+    .optional()
+    .nullable(),
+  salesmanId: z
+    .coerce.number({ invalid_type_error: "Salesman ID must be a number." })
+    .int({ message: "Salesman ID must be an integer." })
+    .positive({ message: "Salesman ID must be a positive integer." })
+    .optional()
+    .nullable(),
+  saleType: z.enum(["CASH", "CREDIT"], {
+    errorMap: () => ({ message: "Sale type must be either CASH or CREDIT." })
+  }).default("CASH").optional(),
+  invoiceDate: z
+    .coerce.date({ invalid_type_error: "Invoice date must be a valid date." })
+    .optional(),
+  discount: z
+    .coerce.number({ invalid_type_error: "Discount must be a number." })
+    .nonnegative({ message: "Discount must be a non-negative number." })
+    .default(0)
+    .optional(),
+  transportDiscount: z
+    .coerce.number({ invalid_type_error: "Transport discount must be a number." })
+    .nonnegative({ message: "Transport discount must be a non-negative number." })
+    .default(0)
+    .optional(),
+  paidAmount: z
+    .coerce.number({ invalid_type_error: "Paid amount must be a number." })
+    .nonnegative({ message: "Paid amount must be a non-negative number." })
+    .default(0)
+    .optional(),
+  creditApplied: z
+    .coerce.number({ invalid_type_error: "Credit applied must be a number." })
+    .nonnegative({ message: "Credit applied must be a non-negative number." })
+    .default(0)
+    .optional(),
+  documentStatus: z.enum(["DRAFT", "POSTED"], {
+    errorMap: () => ({ message: "Document status must be either DRAFT or POSTED." })
+  }).optional(),
   description: z
     .string()
     .trim()

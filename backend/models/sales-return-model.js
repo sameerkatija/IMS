@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const stockModel = require("./stock-model");
 const ledgerModel = require("./ledger-model");
 const glModel = require("./gl-model");
+const fifoCostModel = require("./fifo-cost-model");
 const systemModel = require("./system-model");
 const { generateDocNumber } = require("../config/doc-number");
 
@@ -155,7 +156,7 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
         },
       });
 
-      // Adjust stock (incrementing stock back in at current pool WAC)
+      // Adjust stock (incrementing stock back in)
       await stockModel.adjustStock(
         {
           productId: item.productId,
@@ -165,6 +166,17 @@ async function createSalesReturn({ customerId, invoiceId, returnDate, reason, it
           referenceId: salesReturn.id,
           description: reason || `Sales Return ${returnNo}`,
           createdById,
+        },
+        tx
+      );
+
+      // Restore returned items into a FIFO cost layer at their exact historical cost
+      await fifoCostModel.restoreFIFOCost(
+        {
+          productId: item.productId,
+          quantity: item.quantity,
+          unitCost: costPriceAtSale,
+          receivedDate: salesReturn.returnDate,
         },
         tx
       );

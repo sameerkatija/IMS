@@ -1,15 +1,19 @@
 require("dotenv").config();
 const prisma = require("../config/prisma");
+const { seedGLAccounts } = require("../config/seed-gl-accounts");
 
 async function main() {
   console.log("Seeding master data...");
+
+  // 0. Seed Chart of Accounts (GL Accounts)
+  await seedGLAccounts(prisma);
+  console.log("GL Accounts seeded.");
 
   // 1. Recreate default User (id: 1)
   const user = await prisma.user.upsert({
     where: { username: "test" },
     update: {},
     create: {
-      id: 1,
       name: "Test Administrator",
       username: "test",
       email: "test@example.com",
@@ -21,12 +25,11 @@ async function main() {
   });
   console.log("User seeded:", user.username);
 
-  // 2. Recreate Category (id: 1)
+  // 2. Recreate Category (Beverages)
   const category = await prisma.category.upsert({
     where: { name: "Beverages" },
     update: {},
     create: {
-      id: 1,
       name: "Beverages",
       isActive: true,
     },
@@ -36,11 +39,10 @@ async function main() {
   // 3. Recreate Products
   const productsData = [
     {
-      id: 1,
       name: "Pepsi 1.5L",
       barcode: "1111111111",
       sku: "PEPSI1.5L",
-      categoryId: 1,
+      categoryId: category.id,
       costPrice: 100.0,
       sellingPrice: 150.0,
       weightedAvgCost: 99.8276,
@@ -49,11 +51,10 @@ async function main() {
       isActive: true,
     },
     {
-      id: 2,
       name: "Lays Chips",
       barcode: "2222222222",
       sku: "LAYS",
-      categoryId: 1,
+      categoryId: category.id,
       costPrice: 40.0,
       sellingPrice: 60.0,
       weightedAvgCost: 39.0,
@@ -62,11 +63,10 @@ async function main() {
       isActive: true,
     },
     {
-      id: 7,
       name: "Race Product",
       barcode: null,
       sku: "RACE-1",
-      categoryId: 1,
+      categoryId: category.id,
       costPrice: 50.0,
       sellingPrice: 100.0,
       weightedAvgCost: 0,
@@ -78,7 +78,7 @@ async function main() {
 
   for (const p of productsData) {
     await prisma.product.upsert({
-      where: { id: p.id },
+      where: { sku: p.sku },
       update: {},
       create: p,
     });

@@ -241,8 +241,26 @@ const Purchases = () => {
 
       {isFormOpen ? (
         /* Create Purchase Form View */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm max-w-4xl mx-auto no-print">
-          <h2 className="text-lg font-bold mb-4">Record Stock Ingest</h2>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm max-w-6xl w-full mx-auto no-print">
+          <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ShoppingCart className="text-sky-600" size={22} />
+                Record Stock Ingest / Purchase
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Record supplier inventory consignment and piece unit costs.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(false)}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Trash2 size={16} className="hidden" />
+              <span className="text-xs font-semibold">✕ Close</span>
+            </button>
+          </div>
 
           <form onSubmit={handlePurchaseSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -252,11 +270,11 @@ const Purchases = () => {
                   required
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm font-semibold"
                 >
-                  <option value="">Select Supplier</option>
+                  <option value="">Select Supplier...</option>
                   {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} (Bal: Rs. {formatCurrencyNoDecimals(s.balance)} )</option>
+                    <option key={s.id} value={s.id}>{s.name} (Bal: Rs. {formatCurrencyNoDecimals(s.balance)})</option>
                   ))}
                 </select>
               </div>
@@ -280,103 +298,188 @@ const Purchases = () => {
                 <button
                   type="button"
                   onClick={addItemRow}
-                  className="inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 transition-colors"
                 >
-                  <Plus size={12} className="mr-1" /> Add Row
+                  <Plus size={13} className="mr-1" /> Add Row
                 </button>
               </div>
 
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <div key={index} className="flex flex-col md:flex-row md:items-end gap-3 bg-slate-50/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/50 relative">
-                    <div className="flex-1 relative">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Product *</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Type to search product..."
-                          value={searchQueries[index] || ""}
-                          onFocus={() => setOpenDropdownIndex(index)}
-                          onChange={(e) => {
-                            const query = e.target.value;
-                            const nextQueries = [...searchQueries];
-                            nextQueries[index] = query;
-                            setSearchQueries(nextQueries);
-                            setOpenDropdownIndex(index);
-
-                            // If user clears input, clear selection
-                            if (!query.trim()) {
-                              handleItemChange(index, "productId", "");
-                            }
-                          }}
-                          className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                        />
-
-                        {/* Custom Dropdown List */}
-                        {openDropdownIndex === index && (
-                          <>
-                            {/* Backdrop click to close */}
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
-
-                            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-20 divide-y divide-slate-100 dark:divide-slate-800">
-                              {(() => {
-                                const q = (searchQueries[index] || "").toLowerCase().trim();
-                                const filtered = products.filter(p =>
-                                  p.name.toLowerCase().includes(q) ||
-                                  (p.sku && p.sku.toLowerCase().includes(q)) ||
-                                  (p.barcode && p.barcode.toLowerCase().includes(q))
-                                );
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div className="px-3 py-2 text-xs text-slate-450 italic">
-                                      No products found
-                                    </div>
-                                  );
-                                }
-
-                                return filtered.map((p) => (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => {
-                                      handleItemChange(index, "productId", p.id.toString());
-                                      const nextQueries = [...searchQueries];
-                                      nextQueries[index] = `${p.name}${p.size ? ` (${p.size})` : ""}${p.sku ? ` [${p.sku}]` : ""}`;
-                                      setSearchQueries(nextQueries);
-                                      setOpenDropdownIndex(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-350 transition-colors"
-                                  >
-                                    <span className="font-semibold block">{p.name}</span>
-                                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                                      {p.size ? `Size: ${p.size}` : ""}{p.sku ? ` | SKU: ${p.sku}` : ""}{p.barcode ? ` | Barcode: ${p.barcode}` : ""}
+                  <div
+                    key={index}
+                    className="flex flex-col xl:flex-row xl:items-end gap-3 bg-slate-50/60 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 relative shadow-xs"
+                  >
+                    <div className="flex-1 xl:min-w-[340px] relative">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 tracking-wider">Product *</label>
+                      
+                      {(() => {
+                        const selectedProd = products.find(p => p.id === Number(item.productId));
+                        if (selectedProd && openDropdownIndex !== index) {
+                          return (
+                            <div className="flex items-center justify-between px-3 py-2 bg-white dark:bg-slate-950 border border-sky-200 dark:border-sky-900/60 rounded-xl shadow-xs min-h-[44px]">
+                              <div className="min-w-0 pr-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm text-slate-900 dark:text-white">
+                                    {selectedProd.name}
+                                  </span>
+                                  {selectedProd.size ? (
+                                    <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-300 dark:border-sky-800 shadow-xs">
+                                      Size: {selectedProd.size}
                                     </span>
-                                  </button>
-                                ));
-                              })()}
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">No Size</span>
+                                  )}
+                                  {selectedProd.category?.name && (
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                      {selectedProd.category.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-1 flex gap-3">
+                                  <span>Current Stock: <strong className="text-slate-700 dark:text-slate-300">{selectedProd.stockQuantity} pcs</strong></span>
+                                  <span>Ref Cost: <strong className="text-slate-700 dark:text-slate-300">Rs. {formatCurrencyNoDecimals(selectedProd.costPrice)}</strong></span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenDropdownIndex(index);
+                                  const nextQueries = [...searchQueries];
+                                  nextQueries[index] = "";
+                                  setSearchQueries(nextQueries);
+                                }}
+                                className="px-2.5 py-1 text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-lg transition-colors shrink-0 border border-sky-200 dark:border-sky-900/40"
+                              >
+                                Change
+                              </button>
                             </div>
-                          </>
-                        )}
-                      </div>
+                          );
+                        }
+
+                        return (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Search by name, size, category..."
+                              value={searchQueries[index] || ""}
+                              onFocus={() => setOpenDropdownIndex(index)}
+                              onChange={(e) => {
+                                const query = e.target.value;
+                                const nextQueries = [...searchQueries];
+                                nextQueries[index] = query;
+                                setSearchQueries(nextQueries);
+                                setOpenDropdownIndex(index);
+
+                                if (!query.trim()) {
+                                  handleItemChange(index, "productId", "");
+                                }
+                              }}
+                              className="w-full px-3.5 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm shadow-xs"
+                            />
+
+                            {/* Custom Dropdown List Grouped by Category */}
+                            {openDropdownIndex === index && (
+                              <>
+                                <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
+
+                                <div className="absolute left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-20 divide-y divide-slate-100 dark:divide-slate-800">
+                                  {(() => {
+                                    const q = (searchQueries[index] || "").toLowerCase().trim();
+                                    const filtered = products.filter(p => {
+                                      const cat = (p.category?.name || "").toLowerCase();
+                                      const name = p.name.toLowerCase();
+                                      const size = (p.size || "").toLowerCase();
+                                      const sku = (p.sku || "").toLowerCase();
+                                      const barcode = (p.barcode || "").toLowerCase();
+                                      return name.includes(q) || size.includes(q) || cat.includes(q) || sku.includes(q) || barcode.includes(q);
+                                    });
+
+                                    if (filtered.length === 0) {
+                                      return (
+                                        <div className="px-4 py-3 text-xs text-slate-400 italic text-center">
+                                          No matching products found
+                                        </div>
+                                      );
+                                    }
+
+                                    // Group products by category
+                                    const grouped = {};
+                                    for (const p of filtered) {
+                                      const catName = p.category?.name || "Uncategorized";
+                                      if (!grouped[catName]) grouped[catName] = [];
+                                      grouped[catName].push(p);
+                                    }
+
+                                    return Object.entries(grouped).map(([catName, prodList]) => (
+                                      <div key={catName} className="py-1">
+                                        <div className="px-3 py-1 bg-slate-100/90 dark:bg-slate-800/90 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 sticky top-0 flex justify-between items-center z-10 backdrop-blur-xs">
+                                          <span>{catName}</span>
+                                          <span className="text-[9px] font-normal lowercase opacity-75">({prodList.length} items)</span>
+                                        </div>
+                                        {prodList.map((p) => (
+                                          <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => {
+                                              handleItemChange(index, "productId", p.id.toString());
+                                              const nextQueries = [...searchQueries];
+                                              nextQueries[index] = `${p.name}${p.size ? ` (${p.size})` : ""}`;
+                                              setSearchQueries(nextQueries);
+                                              setOpenDropdownIndex(null);
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/50 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between group"
+                                          >
+                                            <div className="min-w-0 pr-2">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                                  {p.name}
+                                                </span>
+                                                {p.size ? (
+                                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                                                    {p.size}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-[10px] text-slate-400 italic">No size</span>
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-slate-400 mt-0.5 flex gap-2">
+                                                <span>Stock: <strong className="text-slate-600 dark:text-slate-300">{p.stockQuantity} pcs</strong></span>
+                                                {p.sku && <span>SKU: {p.sku}</span>}
+                                              </div>
+                                            </div>
+                                            <div className="text-right text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                                              Rs. {formatCurrencyNoDecimals(p.costPrice)}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    ));
+                                  })()}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    <div className="w-full md:w-32">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty (pieces) *</label>
+                    <div className="w-full sm:w-28">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty (pcs) *</label>
                       <input
                         type="number"
                         required
                         min="1"
-                        placeholder="Pieces"
+                        placeholder="1"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
                       />
                     </div>
 
-                    <div className="w-full md:w-36">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Cost Per Piece *</label>
+                    <div className="w-full sm:w-32">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Cost / pc (PKR) *</label>
                       <input
                         type="number"
                         required
@@ -385,11 +488,11 @@ const Purchases = () => {
                         placeholder="Cost"
                         value={item.unitCost}
                         onChange={(e) => handleItemChange(index, "unitCost", e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
                       />
                     </div>
 
-                    <div className="w-full md:w-32">
+                    <div className="w-full sm:w-36">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Discount (PKR)</label>
                       <input
                         type="number"
@@ -397,13 +500,13 @@ const Purchases = () => {
                         placeholder="0.00"
                         value={item.discount}
                         onChange={(e) => handleItemChange(index, "discount", e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
                       />
                     </div>
 
-                    <div className="w-full md:w-36">
+                    <div className="w-full sm:w-40">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Line Subtotal</label>
-                      <div className="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-850 rounded-lg text-sm text-slate-500 text-right font-semibold select-none">
+                      <div className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-white text-right font-bold select-none shadow-xs">
                         Rs. {formatCurrency(Math.max(0, (Number(item.quantity) || 0) * (Number(item.unitCost) || 0) - (Number(item.discount) || 0)))}
                       </div>
                     </div>
@@ -412,7 +515,7 @@ const Purchases = () => {
                       <button
                         type="button"
                         onClick={() => removeItemRow(index)}
-                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg border border-transparent hover:border-rose-100 transition-all self-center md:self-end mb-0.5"
+                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl border border-transparent hover:border-rose-100 transition-all self-center xl:self-end mb-0.5"
                       >
                         <Trash2 size={16} />
                       </button>
