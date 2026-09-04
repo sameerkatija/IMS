@@ -4,7 +4,7 @@ const getAllSalesmans = async (req, res) => {
     try {
 
         const page = Number(req.query.page || 1);
-        const limit = Number(req.query.limit || 10);
+        const limit = req.query.limit === "all" ? 50000 : Number(req.query.limit || 10);
 
         const where = {};
 
@@ -28,7 +28,7 @@ const getAllSalesmans = async (req, res) => {
             where.isActive = req.query.isActive === "true";
         }
 
-        const skip = (page - 1) * limit;
+        const skip = req.query.limit === "all" ? 0 : (page - 1) * limit;
 
         const [salesmans, total] = await Promise.all([
             salesman.getAllSalesman({ where, skip, take: limit }),

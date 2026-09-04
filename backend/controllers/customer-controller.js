@@ -5,7 +5,7 @@ const getAllCustomers = async (req, res) => {
     try {
 
         const page = Number(req.query.page || 1);
-        const limit = Number(req.query.limit || 10);
+        const limit = req.query.limit === "all" ? 50000 : Number(req.query.limit || 10);
 
         const where = {};
 
@@ -39,10 +39,13 @@ const getAllCustomers = async (req, res) => {
             }
         }
 
-        const skip = (page - 1) * limit;
+        const skip = req.query.limit === "all" ? 0 : (page - 1) * limit;
+        const orderBy = req.query.sortBy === "name" 
+            ? { name: "asc" } 
+            : { createdAt: "desc" };
 
         const [customers, total] = await Promise.all([
-            customer.getAllCustomers({ where, skip, take: limit }),
+            customer.getAllCustomers({ where, skip, take: limit, orderBy }),
             customer.countCustomers(where),
         ]);
         res.json({

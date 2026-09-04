@@ -1,13 +1,11 @@
 const prisma = require('../config/prisma');
 
-const getAllCustomers = ({ where = {}, skip = 0, take = 10 }) => {
+const getAllCustomers = ({ where = {}, skip = 0, take = 10, orderBy = { createdAt: "desc" } }) => {
     return prisma.customer.findMany({
         where,
         skip,
         take,
-        orderBy: {
-            createdAt: "desc",
-        },
+        orderBy,
     });
 };
 

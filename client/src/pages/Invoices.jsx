@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { Receipt, Plus, Search, Eye, Printer, Trash2, Calendar, Edit3, CheckCircle, Lock, AlertTriangle, X } from "lucide-react";
+import { Receipt, Plus, Search, Eye, Printer, Trash2, Calendar, Edit3, CheckCircle, Lock, AlertTriangle, X, ChevronDown, User } from "lucide-react";
 import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
@@ -38,8 +38,10 @@ const Invoices = () => {
   const [editingInvoiceNo, setEditingInvoiceNo] = useState("");
 
   const [customerId, setCustomerId] = useState("");
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const [salesmanId, setSalesmanId] = useState("");
-  const [saleType, setSaleType] = useState("CASH"); // CASH vs CREDIT
+  const [saleType, setSaleType] = useState("CREDIT"); // Default is CREDIT
   const [discount, setDiscount] = useState("0");
   const [discountType, setDiscountType] = useState("%"); // default is %
   const [transportDiscount, setTransportDiscount] = useState("0");
@@ -48,9 +50,9 @@ const Invoices = () => {
   const [creditApplied, setCreditApplied] = useState("0");
   const [description, setDescription] = useState("");
 
-  // Items state with row-level discountType and discountValue
+  // Items state with row-level discountType defaulting to PER_PIECE (/pc)
   const [items, setItems] = useState([
-    { productId: "", quantity: "1", unitPrice: "", discountType: "PKR", discountValue: "0" }
+    { productId: "", quantity: "1", unitPrice: "", discountType: "PER_PIECE", discountValue: "0" }
   ]);
   const [searchQueries, setSearchQueries] = useState([""]);
   const [openDropdownIndex, setOpenDropdownIndex] = useState(null);
@@ -105,9 +107,9 @@ const Invoices = () => {
   const fetchDependencies = async () => {
     try {
       const [custRes, salesRes, prodRes] = await Promise.all([
-        api.get("/api/customer?limit=100&isActive=true"),
-        api.get("/api/salesman?limit=100&isActive=true"),
-        api.get("/api/product?limit=200&isActive=true")
+        api.get("/api/customer?limit=all&isActive=true&sortBy=name"),
+        api.get("/api/salesman?limit=all&isActive=true"),
+        api.get("/api/product?limit=all&isActive=true")
       ]);
       if (custRes.data?.type === "success") setCustomers(custRes.data.data);
       if (salesRes.data?.type === "success") setSalesmen(salesRes.data.data);
@@ -126,8 +128,8 @@ const Invoices = () => {
   }, []);
 
   const addItemRow = () => {
-    setItems([...items, { productId: "", quantity: "1", unitPrice: "", discountType: "PKR", discountValue: "0" }]);
-    setSearchQueries([...searchQueries, ""]);
+    setItems(prev => [...prev, { productId: "", quantity: "1", unitPrice: "", discountType: "PER_PIECE", discountValue: "0" }]);
+    setSearchQueries(prev => [...prev, ""]);
   };
 
   const removeItemRow = (index) => {
@@ -226,8 +228,10 @@ const Invoices = () => {
     setEditingInvoiceId(null);
     setEditingInvoiceNo("");
     setCustomerId("");
+    setCustomerSearchQuery("");
+    setIsCustomerDropdownOpen(false);
     setSalesmanId("");
-    setSaleType("CASH");
+    setSaleType("CREDIT");
     setDiscount("0");
     setDiscountType("%");
     setTransportDiscount("0");
@@ -235,7 +239,7 @@ const Invoices = () => {
     setPaidAmount("0");
     setCreditApplied("0");
     setDescription("");
-    setItems([{ productId: "", quantity: "1", unitPrice: "", discountType: "PKR", discountValue: "0" }]);
+    setItems([{ productId: "", quantity: "1", unitPrice: "", discountType: "PER_PIECE", discountValue: "0" }]);
     setSearchQueries([""]);
     setOpenDropdownIndex(null);
     setIsFormOpen(false);
@@ -510,9 +514,10 @@ const Invoices = () => {
 
       {/* Invoice Creation / Edit Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-6xl w-full p-6 md:p-7 shadow-2xl space-y-6 my-6">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div>
                 <h3 className="font-bold text-xl text-slate-900 dark:text-white flex items-center gap-2">
                   <Receipt className="text-sky-600" size={22} />
@@ -521,7 +526,7 @@ const Invoices = () => {
                 <p className="text-xs text-slate-500 mt-0.5">
                   {editingInvoiceId
                     ? "Modify draft line items, quantities, or discounts before confirming."
-                    : "Enter line items, select discount mode (PKR / % / Per Piece), and save as draft or confirm."}
+                    : "Enter line items, select discount mode (Per Piece / % / PKR), and save as draft or confirm."}
                 </p>
               </div>
               <button
@@ -533,492 +538,722 @@ const Invoices = () => {
               </button>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); }} className="space-y-5">
-              {/* Header Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Customer Account</label>
-                  <select
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                  >
-                    <option value="">Walk-In (Counter Cash)</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {Number(c.balance) < 0 ? `(Credit: Rs. ${formatCurrencyNoDecimals(Math.abs(c.balance))})` : `(Due: Rs. ${formatCurrencyNoDecimals(c.balance)})`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Form Container with Scrollable Body & Fixed Action Footer */}
+            <form onSubmit={(e) => { e.preventDefault(); }} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Scrollable Content Body */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5 min-h-0">
+                {/* Header Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Searchable Customer Account Field */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-400 uppercase">Customer Account</label>
+                      <span className="text-[10px] text-slate-400">
+                        {customers.length > 0 ? `${customers.length} accounts` : "Loading..."}
+                      </span>
+                    </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Booker / Salesman</label>
-                  <select
-                    value={salesmanId}
-                    onChange={(e) => setSalesmanId(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                  >
-                    <option value="">Counter / No Salesman</option>
-                    {salesmen.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Billing Type *</label>
-                  <select
-                    value={saleType}
-                    onChange={(e) => setSaleType(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold"
-                  >
-                    <option value="CASH">CASH (Paid at Counter)</option>
-                    <option value="CREDIT">CREDIT (Customer Ledger)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Notes / Narration</label>
-                  <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="e.g. Counter deal"
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Line Items Container */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Cart Line Items</span>
-                  <button
-                    type="button"
-                    onClick={addItemRow}
-                    className="inline-flex items-center px-3 py-1.5 text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 transition-colors"
-                  >
-                    <Plus size={13} className="mr-1" /> Add Row
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {items.map((item, index) => {
-                    const { lineDiscount, netRate, lineSubtotal } = computeRowValues(item);
-
-                    return (
-                      <div
-                        key={index}
-                        className="flex flex-col xl:flex-row xl:items-end gap-3 bg-slate-50/60 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 relative shadow-xs"
-                      >
-                        {/* Product Picker with Category Grouping & Prominent Size */}
-                        <div className="flex-1 xl:min-w-[340px] relative">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 tracking-wider">Product *</label>
-
-                          {(() => {
-                            const selectedProd = products.find(p => p.id === Number(item.productId));
-                            if (selectedProd && openDropdownIndex !== index) {
-                              return (
-                                <div className="flex items-center justify-between px-3 py-2 bg-white dark:bg-slate-950 border border-sky-200 dark:border-sky-900/60 rounded-xl shadow-xs min-h-[44px]">
-                                  <div className="min-w-0 pr-3">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-sm text-slate-900 dark:text-white">
-                                        {selectedProd.name}
-                                      </span>
-                                      {selectedProd.size ? (
-                                        <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-300 dark:border-sky-800 shadow-xs">
-                                          Size: {selectedProd.size}
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] text-slate-400 italic">No Size</span>
-                                      )}
-                                      {selectedProd.category?.name && (
-                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                          {selectedProd.category.name}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-[11px] text-slate-400 mt-1 flex gap-3">
-                                      <span>Stock: <strong className="text-slate-700 dark:text-slate-300">{selectedProd.stockQuantity} pcs</strong></span>
-                                      <span>Selling Rate: <strong className="text-slate-700 dark:text-slate-300">Rs. {formatCurrencyNoDecimals(selectedProd.sellingPrice)}</strong></span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenDropdownIndex(index);
-                                      const nextQueries = [...searchQueries];
-                                      nextQueries[index] = "";
-                                      setSearchQueries(nextQueries);
-                                    }}
-                                    className="px-2.5 py-1 text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-lg transition-colors shrink-0 border border-sky-200 dark:border-sky-900/40"
-                                  >
-                                    Change
-                                  </button>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  required
-                                  placeholder="Search by name, size, category..."
-                                  value={searchQueries[index] || ""}
-                                  onFocus={() => setOpenDropdownIndex(index)}
-                                  onChange={(e) => {
-                                    const query = e.target.value;
-                                    const nextQueries = [...searchQueries];
-                                    nextQueries[index] = query;
-                                    setSearchQueries(nextQueries);
-                                    setOpenDropdownIndex(index);
-
-                                    if (!query.trim()) {
-                                      handleItemChange(index, "productId", "");
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm shadow-xs"
-                                />
-
-                                {openDropdownIndex === index && (
-                                  <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
-
-                                    <div className="absolute left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-20 divide-y divide-slate-100 dark:divide-slate-800">
-                                      {(() => {
-                                        const q = (searchQueries[index] || "").toLowerCase().trim();
-                                        const filtered = products.filter(p => {
-                                          const cat = (p.category?.name || "").toLowerCase();
-                                          const name = p.name.toLowerCase();
-                                          const size = (p.size || "").toLowerCase();
-                                          const sku = (p.sku || "").toLowerCase();
-                                          const barcode = (p.barcode || "").toLowerCase();
-                                          return name.includes(q) || size.includes(q) || cat.includes(q) || sku.includes(q) || barcode.includes(q);
-                                        });
-
-                                        if (filtered.length === 0) {
-                                          return (
-                                            <div className="px-4 py-3 text-xs text-slate-400 italic text-center">
-                                              No matching products found
-                                            </div>
-                                          );
-                                        }
-
-                                        const grouped = {};
-                                        for (const p of filtered) {
-                                          const catName = p.category?.name || "Uncategorized";
-                                          if (!grouped[catName]) grouped[catName] = [];
-                                          grouped[catName].push(p);
-                                        }
-
-                                        return Object.entries(grouped).map(([catName, prodList]) => (
-                                          <div key={catName} className="py-1">
-                                            <div className="px-3 py-1 bg-slate-100/90 dark:bg-slate-800/90 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 sticky top-0 flex justify-between items-center z-10 backdrop-blur-xs">
-                                              <span>{catName}</span>
-                                              <span className="text-[9px] font-normal lowercase opacity-75">({prodList.length} items)</span>
-                                            </div>
-                                            {prodList.map((p) => (
-                                              <button
-                                                key={p.id}
-                                                type="button"
-                                                onClick={() => {
-                                                  handleItemChange(index, "productId", p.id.toString());
-                                                  const nextQueries = [...searchQueries];
-                                                  nextQueries[index] = `${p.name}${p.size ? ` (${p.size})` : ""}`;
-                                                  setSearchQueries(nextQueries);
-                                                  setOpenDropdownIndex(null);
-                                                }}
-                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/50 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between group"
-                                              >
-                                                <div className="min-w-0 pr-2">
-                                                  <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400">
-                                                      {p.name}
-                                                    </span>
-                                                    {p.size ? (
-                                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                                                        {p.size}
-                                                      </span>
-                                                    ) : (
-                                                      <span className="text-[10px] text-slate-400 italic">No size</span>
-                                                    )}
-                                                  </div>
-                                                  <div className="text-[10px] text-slate-400 mt-0.5 flex gap-2">
-                                                    <span>Stock: <strong className="text-slate-600 dark:text-slate-300">{p.stockQuantity} pcs</strong></span>
-                                                    {p.sku && <span>SKU: {p.sku}</span>}
-                                                  </div>
-                                                </div>
-                                                <div className="text-right text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
-                                                  Rs. {formatCurrencyNoDecimals(p.sellingPrice)}
-                                                </div>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        ));
-                                      })()}
-                                    </div>
-                                  </>
+                    {(() => {
+                      const selectedCust = customers.find(c => c.id === Number(customerId));
+                      if (selectedCust && !isCustomerDropdownOpen) {
+                        const bal = Number(selectedCust.balance || 0);
+                        return (
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-white dark:bg-slate-950 border border-sky-300 dark:border-sky-800 rounded-xl shadow-xs min-h-[42px]">
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                  {selectedCust.name}
+                                </span>
+                                {bal > 0 ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                    Due: Rs. {formatCurrencyNoDecimals(bal)}
+                                  </span>
+                                ) : bal < 0 ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                    Credit: Rs. {formatCurrencyNoDecimals(Math.abs(bal))}
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    Rs. 0
+                                  </span>
                                 )}
                               </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Qty */}
-                        <div className="w-full sm:w-28">
-                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty (pcs) *</label>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            placeholder="1"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
-                          />
-                        </div>
-
-                        {/* Unit Selling Price */}
-                        <div className="w-full sm:w-32">
-                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Rate (PKR) *</label>
-                          <input
-                            type="number"
-                            required
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={item.unitPrice}
-                            onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
-                          />
-                        </div>
-
-                        {/* Row-Level Discount with Type Selector */}
-                        <div className="w-full sm:w-44">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Discount</label>
-                            <div className="flex bg-slate-200 dark:bg-slate-800 rounded-md p-0.5 text-[9px] font-bold">
+                              {selectedCust.phone && (
+                                <div className="text-[10px] text-slate-400 mt-0.5">Ph: {selectedCust.phone}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
-                                onClick={() => handleItemChange(index, "discountType", "PKR")}
-                                className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                                onClick={() => {
+                                  setIsCustomerDropdownOpen(true);
+                                  setCustomerSearchQuery("");
+                                }}
+                                className="px-2 py-1 text-xs font-bold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/60 rounded-lg transition-colors border border-sky-200 dark:border-sky-800"
                               >
-                                PKR
+                                Change
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleItemChange(index, "discountType", "%")}
-                                className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                                onClick={() => {
+                                  setCustomerId("");
+                                  setCustomerSearchQuery("");
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                                title="Switch to Walk-In"
                               >
-                                %
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleItemChange(index, "discountType", "PER_PIECE")}
-                                className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "PER_PIECE" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
-                                title="Discount per piece"
-                              >
-                                /pc
+                                <X size={14} />
                               </button>
                             </div>
                           </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={item.discountValue}
-                            onChange={(e) => handleItemChange(index, "discountValue", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs"
-                          />
-                        </div>
-
-                        {/* Real-time Net Rate & Line Subtotal */}
-                        <div className="w-full sm:w-40 flex flex-col justify-end">
-                          <div className="flex items-center justify-between text-[10px] mb-1">
-                            <span className="text-slate-400 font-semibold uppercase">Net Rate:</span>
-                            <span className="font-extrabold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/60">
-                              Rs. {formatCurrency(netRate)}/pc
-                            </span>
-                          </div>
-                          <div className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-white text-right font-bold select-none shadow-xs">
-                            Rs. {formatCurrency(lineSubtotal)}
-                          </div>
-                        </div>
-
-                        {items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeItemRow(index)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-colors self-center lg:self-end mb-0.5"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Discount, Paid Amount, Applied Credit and Summary panel */}
-              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4">
-                <div className="flex flex-wrap gap-4">
-                  {/* Header Invoice Discount */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Extra Disc</label>
-                      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
-                        <button
-                          type="button"
-                          onClick={() => setDiscountType("PKR")}
-                          className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
-                        >
-                          PKR
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDiscountType("%")}
-                          className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
-                        >
-                          %
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      value={discount}
-                      onChange={(e) => setDiscount(e.target.value)}
-                      className="w-32 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                    />
-                  </div>
-
-                  {/* Transport Discount */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Transport Disc</label>
-                      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
-                        <button
-                          type="button"
-                          onClick={() => setTransportDiscountType("PKR")}
-                          className={`px-1.5 py-0.5 rounded-md transition-colors ${transportDiscountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
-                        >
-                          PKR
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTransportDiscountType("%")}
-                          className={`px-1.5 py-0.5 rounded-md transition-colors ${transportDiscountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
-                        >
-                          %
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      value={transportDiscount}
-                      onChange={(e) => setTransportDiscount(e.target.value)}
-                      className="w-32 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                    />
-                  </div>
-
-                  {/* Paid Amount */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Amount Paid (PKR)</label>
-                    <input
-                      type="number"
-                      value={paidAmount}
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                      disabled={saleType === "CASH"}
-                      className="w-36 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm disabled:opacity-50"
-                    />
-                  </div>
-
-                  {/* Store Credit */}
-                  {saleType === "CREDIT" && (
-                    (() => {
-                      const selectedCustomer = customers.find(c => c.id === Number(customerId));
-                      const availableCredit = selectedCustomer && Number(selectedCustomer.balance) < 0 ? Math.abs(Number(selectedCustomer.balance)) : 0;
-                      if (availableCredit > 0) {
-                        return (
-                          <div>
-                            <label className="text-xs font-semibold text-amber-600 dark:text-amber-500 uppercase block mb-1">
-                              Apply Store Credit (Max Rs. {formatCurrencyNoDecimals(availableCredit)})
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max={availableCredit}
-                              value={creditApplied}
-                              onChange={(e) => {
-                                const val = Number(e.target.value) || 0;
-                                if (val > availableCredit) {
-                                  setCreditApplied(availableCredit.toString());
-                                } else if (val < 0) {
-                                  setCreditApplied("0");
-                                } else {
-                                  setCreditApplied(e.target.value);
-                                }
-                              }}
-                              className="w-44 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-300 rounded-xl focus:ring-1 focus:ring-amber-500 outline-none text-sm font-semibold"
-                            />
-                          </div>
                         );
                       }
-                      return null;
-                    })()
-                  )}
+
+                      return (
+                        <div className="relative">
+                          <div className="relative">
+                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search by name or phone (or Walk-In)..."
+                              value={isCustomerDropdownOpen ? customerSearchQuery : (customerId ? (selectedCust?.name || "") : "")}
+                              onFocus={() => {
+                                setIsCustomerDropdownOpen(true);
+                                if (!customerSearchQuery) setCustomerSearchQuery("");
+                              }}
+                              onChange={(e) => {
+                                setCustomerSearchQuery(e.target.value);
+                                setIsCustomerDropdownOpen(true);
+                              }}
+                              className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm shadow-xs"
+                            />
+                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          </div>
+
+                          {isCustomerDropdownOpen && (
+                            <>
+                              <div className="fixed inset-0 z-20" onClick={() => setIsCustomerDropdownOpen(false)} />
+                              <div className="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-30 divide-y divide-slate-100 dark:divide-slate-800">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomerId("");
+                                    setIsCustomerDropdownOpen(false);
+                                    setCustomerSearchQuery("");
+                                  }}
+                                  className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${!customerId ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-300"}`}
+                                >
+                                  <div>
+                                    <span className="font-semibold block">Walk-In (Counter Cash)</span>
+                                    <span className="text-[10px] text-slate-400">Cash sale without customer account</span>
+                                  </div>
+                                  {!customerId && <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">Selected</span>}
+                                </button>
+
+                                {(() => {
+                                  const q = customerSearchQuery.toLowerCase().trim();
+                                  const filtered = customers.filter(c => {
+                                    if (!q) return true;
+                                    return (c.name || "").toLowerCase().includes(q) || (c.phone || "").includes(q);
+                                  });
+
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="px-4 py-3 text-center text-xs text-slate-400 italic">
+                                        No customer matching &quot;{customerSearchQuery}&quot; ({customers.length} loaded)
+                                      </div>
+                                    );
+                                  }
+
+                                  return filtered.map(c => {
+                                    const bal = Number(c.balance || 0);
+                                    const isSelected = customerId === c.id.toString();
+                                    return (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setCustomerId(c.id.toString());
+                                          setIsCustomerDropdownOpen(false);
+                                          setCustomerSearchQuery("");
+                                        }}
+                                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${isSelected ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`}
+                                      >
+                                        <div className="min-w-0 pr-2">
+                                          <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                            {c.name}
+                                          </span>
+                                          {c.phone && <span className="text-[10px] text-slate-400 block">{c.phone}</span>}
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                          {bal > 0 ? (
+                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900">
+                                              Due: Rs. {formatCurrencyNoDecimals(bal)}
+                                            </span>
+                                          ) : bal < 0 ? (
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
+                                              Credit: Rs. {formatCurrencyNoDecimals(Math.abs(bal))}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-400">Rs. 0</span>
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Booker / Salesman</label>
+                    <select
+                      value={salesmanId}
+                      onChange={(e) => setSalesmanId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                    >
+                      <option value="">Counter / No Salesman</option>
+                      {salesmen.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Billing Type *</label>
+                    <select
+                      value={saleType}
+                      onChange={(e) => setSaleType(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold text-sky-700 dark:text-sky-300"
+                    >
+                      <option value="CREDIT">CREDIT (Customer Ledger)</option>
+                      <option value="CASH">CASH (Paid at Counter)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Notes / Narration</label>
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="e.g. Counter deal, terms..."
+                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                    />
+                  </div>
                 </div>
 
-                {/* Summary Box */}
-                <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-right w-full md:w-80 space-y-1.5">
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>Gross Items Total:</span>
-                    <span className="font-semibold">Rs. {formatCurrency(subtotal)}</span>
-                  </div>
-                  {Number(calculatedDiscountAmount) > 0 && (
-                    <div className="flex justify-between text-xs text-rose-500">
-                      <span>Header Discount:</span>
-                      <span className="font-semibold text-rose-600 dark:text-rose-400">
-                        {discountType === "%"
-                          ? `- ${Number(discount || 0)}% (Rs. ${formatCurrency(calculatedDiscountAmount)})`
-                          : `- Rs. ${formatCurrency(Number(discount || 0))}`}
+                {/* Line Items Container */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Cart Line Items</span>
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                        {items.length} {items.length === 1 ? "item" : "items"}
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-xs text-slate-500 font-semibold border-t border-slate-200 dark:border-slate-800/40 pt-1.5">
-                    <span>Running Total:</span>
-                    <span className="text-slate-700 dark:text-slate-350">Rs. {formatCurrency(total)}</span>
+                    <span className="text-[11px] text-slate-400 italic hidden sm:inline">
+                      Tip: Press Enter on discount to add next row
+                    </span>
                   </div>
-                  {Number(calculatedTransportDiscountAmount) > 0 && (
-                    <div className="flex justify-between text-xs text-amber-500">
-                      <span>Transport Disc (Expense):</span>
-                      <span className="font-semibold text-amber-600 dark:text-amber-400">
-                        {transportDiscountType === "%"
-                          ? `- ${Number(transportDiscount || 0)}% (Rs. ${formatCurrency(calculatedTransportDiscountAmount)})`
-                          : `- Rs. ${formatCurrency(Number(transportDiscount || 0))}`}
-                      </span>
+
+                  <div className="space-y-3">
+                    {items.map((item, index) => {
+                      const { lineDiscount, netRate, lineSubtotal } = computeRowValues(item);
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex flex-col xl:flex-row xl:items-end gap-3 bg-slate-50/60 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 relative shadow-xs"
+                        >
+                          {/* Row Index Badge */}
+                          <div className="hidden xl:flex items-center justify-center w-6 h-10 text-[11px] font-bold text-slate-400">
+                            #{index + 1}
+                          </div>
+
+                          {/* Product Picker with Category Grouping & Prominent Size */}
+                          <div className="flex-1 xl:min-w-[340px] relative">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 tracking-wider">Product *</label>
+
+                            {(() => {
+                              const selectedProd = products.find(p => p.id === Number(item.productId));
+                              if (selectedProd && openDropdownIndex !== index) {
+                                return (
+                                  <div className="flex items-center justify-between px-3 py-2 bg-white dark:bg-slate-950 border border-sky-200 dark:border-sky-900/60 rounded-xl shadow-xs min-h-[44px]">
+                                    <div className="min-w-0 pr-3">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-sm text-slate-900 dark:text-white">
+                                          {selectedProd.name}
+                                        </span>
+                                        {selectedProd.size ? (
+                                          <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-300 dark:border-sky-800 shadow-xs">
+                                            Size: {selectedProd.size}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400 italic">No Size</span>
+                                        )}
+                                        {selectedProd.category?.name && (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                            {selectedProd.category.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[11px] text-slate-400 mt-1 flex gap-3">
+                                        <span>Stock: <strong className="text-slate-700 dark:text-slate-300">{selectedProd.stockQuantity} pcs</strong></span>
+                                        <span>Selling Rate: <strong className="text-slate-700 dark:text-slate-300">Rs. {formatCurrencyNoDecimals(selectedProd.sellingPrice)}</strong></span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenDropdownIndex(index);
+                                        const nextQueries = [...searchQueries];
+                                        nextQueries[index] = "";
+                                        setSearchQueries(nextQueries);
+                                      }}
+                                      className="px-2.5 py-1 text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-lg transition-colors shrink-0 border border-sky-200 dark:border-sky-900/40"
+                                    >
+                                      Change
+                                    </button>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="relative">
+                                  <input
+                                    id={`item-search-${index}`}
+                                    type="text"
+                                    required
+                                    placeholder="Search by name, size, category..."
+                                    value={searchQueries[index] || ""}
+                                    onFocus={(e) => {
+                                      e.target.select();
+                                      setOpenDropdownIndex(index);
+                                    }}
+                                    onChange={(e) => {
+                                      const query = e.target.value;
+                                      const nextQueries = [...searchQueries];
+                                      nextQueries[index] = query;
+                                      setSearchQueries(nextQueries);
+                                      setOpenDropdownIndex(index);
+
+                                      if (!query.trim()) {
+                                        handleItemChange(index, "productId", "");
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm shadow-xs"
+                                  />
+
+                                  {openDropdownIndex === index && (
+                                    <>
+                                      <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownIndex(null)} />
+
+                                      <div className="absolute left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-20 divide-y divide-slate-100 dark:divide-slate-800">
+                                        {(() => {
+                                          const q = (searchQueries[index] || "").toLowerCase().trim();
+                                          const filtered = products.filter(p => {
+                                            const cat = (p.category?.name || "").toLowerCase();
+                                            const name = p.name.toLowerCase();
+                                            const size = (p.size || "").toLowerCase();
+                                            const sku = (p.sku || "").toLowerCase();
+                                            const barcode = (p.barcode || "").toLowerCase();
+                                            return name.includes(q) || size.includes(q) || cat.includes(q) || sku.includes(q) || barcode.includes(q);
+                                          });
+
+                                          if (filtered.length === 0) {
+                                            return (
+                                              <div className="px-4 py-3 text-xs text-slate-400 italic text-center">
+                                                No matching products found
+                                              </div>
+                                            );
+                                          }
+
+                                          const grouped = {};
+                                          for (const p of filtered) {
+                                            const catName = p.category?.name || "Uncategorized";
+                                            if (!grouped[catName]) grouped[catName] = [];
+                                            grouped[catName].push(p);
+                                          }
+
+                                          return Object.entries(grouped).map(([catName, prodList]) => (
+                                            <div key={catName} className="py-1">
+                                              <div className="px-3 py-1 bg-slate-100/90 dark:bg-slate-800/90 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 sticky top-0 flex justify-between items-center z-10 backdrop-blur-xs">
+                                                <span>{catName}</span>
+                                                <span className="text-[9px] font-normal lowercase opacity-75">({prodList.length} items)</span>
+                                              </div>
+                                              {prodList.map((p) => (
+                                                <button
+                                                  key={p.id}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    handleItemChange(index, "productId", p.id.toString());
+                                                    const nextQueries = [...searchQueries];
+                                                    nextQueries[index] = `${p.name}${p.size ? ` (${p.size})` : ""}`;
+                                                    setSearchQueries(nextQueries);
+                                                    setOpenDropdownIndex(null);
+                                                    // Auto focus quantity for fast entry
+                                                    setTimeout(() => {
+                                                      const qtyEl = document.getElementById(`item-qty-${index}`);
+                                                      if (qtyEl) {
+                                                        qtyEl.focus();
+                                                        qtyEl.select();
+                                                      }
+                                                    }, 50);
+                                                  }}
+                                                  className="w-full text-left px-3.5 py-2 text-xs hover:bg-sky-50 dark:hover:bg-sky-950/50 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between group"
+                                                >
+                                                  <div className="min-w-0 pr-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                                        {p.name}
+                                                      </span>
+                                                      {p.size ? (
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                                                          {p.size}
+                                                        </span>
+                                                      ) : (
+                                                        <span className="text-[10px] text-slate-400 italic">No size</span>
+                                                      )}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 mt-0.5 flex gap-2">
+                                                      <span>Stock: <strong className="text-slate-600 dark:text-slate-300">{p.stockQuantity} pcs</strong></span>
+                                                      {p.sku && <span>SKU: {p.sku}</span>}
+                                                    </div>
+                                                  </div>
+                                                  <div className="text-right text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                                                    Rs. {formatCurrencyNoDecimals(p.sellingPrice)}
+                                                  </div>
+                                                </button>
+                                              ))}
+                                            </div>
+                                          ));
+                                        })()}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Qty */}
+                          <div className="w-full sm:w-28">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty (pcs) *</label>
+                            <input
+                              id={`item-qty-${index}`}
+                              type="number"
+                              required
+                              min="1"
+                              placeholder="1"
+                              value={item.quantity}
+                              onFocus={(e) => e.target.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const rateEl = document.getElementById(`item-rate-${index}`);
+                                  if (rateEl) {
+                                    rateEl.focus();
+                                    rateEl.select();
+                                  }
+                                }
+                              }}
+                              onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs font-semibold"
+                            />
+                          </div>
+
+                          {/* Unit Selling Price */}
+                          <div className="w-full sm:w-32">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Rate (PKR) *</label>
+                            <input
+                              id={`item-rate-${index}`}
+                              type="number"
+                              required
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={item.unitPrice}
+                              onFocus={(e) => e.target.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const discEl = document.getElementById(`item-discount-${index}`);
+                                  if (discEl) {
+                                    discEl.focus();
+                                    discEl.select();
+                                  }
+                                }
+                              }}
+                              onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs font-semibold"
+                            />
+                          </div>
+
+                          {/* Row-Level Discount with Type Selector (/pc default) */}
+                          <div className="w-full sm:w-44">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase">Discount</label>
+                              <div className="flex bg-slate-200 dark:bg-slate-800 rounded-md p-0.5 text-[9px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => handleItemChange(index, "discountType", "PER_PIECE")}
+                                  className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "PER_PIECE" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                                  title="Discount per piece (Default)"
+                                >
+                                  /pc
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleItemChange(index, "discountType", "%")}
+                                  className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                                  title="Percentage discount"
+                                >
+                                  %
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleItemChange(index, "discountType", "PKR")}
+                                  className={`px-1.5 py-0.5 rounded transition-colors ${item.discountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                                  title="Total flat PKR discount"
+                                >
+                                  PKR
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              id={`item-discount-${index}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={item.discountValue}
+                              onFocus={(e) => e.target.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addItemRow();
+                                  setTimeout(() => {
+                                    const nextProd = document.getElementById(`item-search-${items.length}`);
+                                    if (nextProd) nextProd.focus();
+                                  }, 70);
+                                }
+                              }}
+                              onChange={(e) => handleItemChange(index, "discountValue", e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm shadow-xs font-semibold"
+                            />
+                          </div>
+
+                          {/* Real-time Net Rate & Line Subtotal */}
+                          <div className="w-full sm:w-40 flex flex-col justify-end">
+                            <div className="flex items-center justify-between text-[10px] mb-1">
+                              <span className="text-slate-400 font-semibold uppercase">Net Rate:</span>
+                              <span className="font-extrabold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/60">
+                                Rs. {formatCurrency(netRate)}/pc
+                              </span>
+                            </div>
+                            <div className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-white text-right font-bold select-none shadow-xs">
+                              Rs. {formatCurrency(lineSubtotal)}
+                            </div>
+                          </div>
+
+                          {items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItemRow(index)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-colors self-center lg:self-end mb-0.5"
+                              title="Remove item"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Add Row Button Directly Below Rows */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addItemRow();
+                      setTimeout(() => {
+                        const nextProd = document.getElementById(`item-search-${items.length}`);
+                        if (nextProd) nextProd.focus();
+                      }, 70);
+                    }}
+                    className="w-full py-2.5 px-4 mt-2 rounded-xl border-2 border-dashed border-sky-300 dark:border-sky-800 hover:border-sky-500 dark:hover:border-sky-600 bg-sky-50/50 hover:bg-sky-100/70 dark:bg-sky-950/20 dark:hover:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
+                  >
+                    <Plus size={16} /> Add Row
+                  </button>
+                </div>
+
+                {/* Discount, Paid Amount, Applied Credit and Summary panel */}
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-4 flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4">
+                  <div className="flex flex-wrap gap-4">
+                    {/* Header Invoice Discount */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Extra Disc</label>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("PKR")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                          >
+                            PKR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("%")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${discountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                          >
+                            %
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        value={discount}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setDiscount(e.target.value)}
+                        className="w-32 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold"
+                      />
                     </div>
-                  )}
-                  {Number(creditApplied) > 0 && (
-                    <div className="flex justify-between text-xs text-blue-500">
-                      <span>Store Credit Applied:</span>
-                      <span className="font-semibold">- Rs. {formatCurrency(Number(creditApplied))}</span>
+
+                    {/* Transport Discount */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block">Transport Disc</label>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-2 text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setTransportDiscountType("PKR")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${transportDiscountType === "PKR" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                          >
+                            PKR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTransportDiscountType("%")}
+                            className={`px-1.5 py-0.5 rounded-md transition-colors ${transportDiscountType === "%" ? "bg-white dark:bg-slate-700 text-sky-600 shadow-xs" : "text-slate-500"}`}
+                          >
+                            %
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        value={transportDiscount}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setTransportDiscount(e.target.value)}
+                        className="w-32 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold"
+                      />
                     </div>
-                  )}
-                  <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5 font-bold">
-                    <span>Net Payable Amount:</span>
-                    <span className="text-sky-600 dark:text-sky-400 text-sm">Rs. {formatCurrency(netPayable)}</span>
+
+                    {/* Paid Amount */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase block mb-1">Amount Paid (PKR)</label>
+                      <input
+                        type="number"
+                        value={paidAmount}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setPaidAmount(e.target.value)}
+                        disabled={saleType === "CASH"}
+                        className="w-36 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm font-semibold disabled:opacity-50"
+                      />
+                    </div>
+
+                    {/* Store Credit */}
+                    {saleType === "CREDIT" && (
+                      (() => {
+                        const selectedCustomer = customers.find(c => c.id === Number(customerId));
+                        const availableCredit = selectedCustomer && Number(selectedCustomer.balance) < 0 ? Math.abs(Number(selectedCustomer.balance)) : 0;
+                        if (availableCredit > 0) {
+                          return (
+                            <div>
+                              <label className="text-xs font-semibold text-amber-600 dark:text-amber-500 uppercase block mb-1">
+                                Apply Store Credit (Max Rs. {formatCurrencyNoDecimals(availableCredit)})
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={availableCredit}
+                                value={creditApplied}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  if (val > availableCredit) {
+                                    setCreditApplied(availableCredit.toString());
+                                  } else if (val < 0) {
+                                    setCreditApplied("0");
+                                  } else {
+                                    setCreditApplied(e.target.value);
+                                  }
+                                }}
+                                className="w-44 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-300 rounded-xl focus:ring-1 focus:ring-amber-500 outline-none text-sm font-semibold"
+                              />
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()
+                    )}
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-right w-full md:w-80 space-y-1.5">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Gross Items Total:</span>
+                      <span className="font-semibold">Rs. {formatCurrency(subtotal)}</span>
+                    </div>
+                    {Number(calculatedDiscountAmount) > 0 && (
+                      <div className="flex justify-between text-xs text-rose-500">
+                        <span>Header Discount:</span>
+                        <span className="font-semibold text-rose-600 dark:text-rose-400">
+                          {discountType === "%"
+                            ? `- ${Number(discount || 0)}% (Rs. ${formatCurrency(calculatedDiscountAmount)})`
+                            : `- Rs. ${formatCurrency(Number(discount || 0))}`}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs text-slate-500 font-semibold border-t border-slate-200 dark:border-slate-800/40 pt-1.5">
+                      <span>Running Total:</span>
+                      <span className="text-slate-700 dark:text-slate-350">Rs. {formatCurrency(total)}</span>
+                    </div>
+                    {Number(calculatedTransportDiscountAmount) > 0 && (
+                      <div className="flex justify-between text-xs text-amber-500">
+                        <span>Transport Disc (Expense):</span>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">
+                          {transportDiscountType === "%"
+                            ? `- ${Number(transportDiscount || 0)}% (Rs. ${formatCurrency(calculatedTransportDiscountAmount)})`
+                            : `- Rs. ${formatCurrency(Number(transportDiscount || 0))}`}
+                        </span>
+                      </div>
+                    )}
+                    {Number(creditApplied) > 0 && (
+                      <div className="flex justify-between text-xs text-blue-500">
+                        <span>Store Credit Applied:</span>
+                        <span className="font-semibold">- Rs. {formatCurrency(Number(creditApplied))}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800/60 pt-1.5 font-bold">
+                      <span>Net Payable Amount:</span>
+                      <span className="text-sky-600 dark:text-sky-400 text-sm font-black">Rs. {formatCurrency(netPayable)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons: Save as Draft vs Confirm & Post */}
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              {/* Fixed Action Buttons Footer: Save as Draft vs Confirm & Post */}
+              <div className="px-6 py-3.5 bg-slate-50 dark:bg-slate-950/80 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={resetForm}
@@ -1027,7 +1262,12 @@ const Invoices = () => {
                   Cancel / Close
                 </button>
 
-                <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 mr-2">
+                    <span>Payable:</span>
+                    <span className="font-black text-sky-600 dark:text-sky-400 text-sm">Rs. {formatCurrency(netPayable)}</span>
+                  </div>
+
                   <button
                     type="button"
                     disabled={submitting}
@@ -1035,7 +1275,7 @@ const Invoices = () => {
                     className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-xl transition-colors shadow-xs disabled:opacity-50"
                   >
                     <Edit3 size={14} className="mr-1.5" />
-                    {editingInvoiceId ? "Save Draft Changes" : "Save as Draft (Editable)"}
+                    {editingInvoiceId ? "Save Draft Changes" : "Save as Draft"}
                   </button>
 
                   <button
