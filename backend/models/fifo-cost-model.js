@@ -1,5 +1,24 @@
 const prisma = require("../config/prisma");
 
+let isInventoryCostLayerSupported = null;
+
+async function checkInventoryCostLayerSupport() {
+  if (isInventoryCostLayerSupported !== null) {
+    return isInventoryCostLayerSupported;
+  }
+  try {
+    const res = await prisma.$queryRaw`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'InventoryCostLayer'
+      LIMIT 1;
+    `;
+    isInventoryCostLayerSupported = Array.isArray(res) && res.length > 0;
+  } catch (e) {
+    isInventoryCostLayerSupported = false;
+  }
+  return isInventoryCostLayerSupported;
+}
+
 /**
  * Creates a new FIFO Inventory Cost Layer.
  * Called on every confirmed purchase ingest or initial stock setup.
@@ -14,19 +33,26 @@ async function createCostLayer(
     throw new Error("Cost layer quantity must be positive.");
   }
 
-  const layer = await tx.inventoryCostLayer.create({
-    data: {
-      productId,
-      purchaseId,
-      purchaseItemId,
-      initialQuantity: quantity,
-      remainingQuantity: quantity,
-      unitCost: Number(unitCost),
-      receivedDate,
-    },
-  });
+  const hasTable = await checkInventoryCostLayerSupport();
+  if (!hasTable) return null;
 
-  return layer;
+  try {
+    const layer = await tx.inventoryCostLayer.create({
+      data: {
+        productId,
+        purchaseId,
+        purchaseItemId,
+        initialQuantity: quantity,
+        remainingQuantity: quantity,
+        unitCost: Number(unitCost),
+        receivedDate,
+      },
+    });
+
+    return layer;
+  } catch (err) {
+    return null;
+  }
 }
 
 /**
@@ -40,17 +66,50 @@ async function consumeFIFOCost({ productId, quantity }, txClient) {
     return { totalCOGS: 0, effectiveUnitCostAtSale: 0, layersConsumed: [] };
   }
 
-  // 1. Fetch available layers ordered by receivedDate ASC, id ASC
-  const availableLayers = await tx.inventoryCostLayer.findMany({
-    where: {
-      productId,
-      remainingQuantity: { gt: 0 },
-    },
-    orderBy: [
-      { receivedDate: "asc" },
-      { id: "asc" },
-    ],
-  });
+  const hasTable = await checkInventoryCostLayerSupport();
+  if (!hasTable) {
+    // Directly calculate from product.costPrice without touching inventoryCostLayer
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      select: { costPrice: true },
+    });
+    const fallbackUnitCost = product ? Number(product.costPrice || 0) : 0;
+    const totalCOGS = quantity * fallbackUnitCost;
+    return {
+      totalCOGS: Math.round(totalCOGS * 100) / 100,
+      effectiveUnitCostAtSale: fallbackUnitCost,
+      layersConsumed: [
+        {
+          fallback: true,
+          quantity,
+          unitCost: fallbackUnitCost,
+          lineCost: totalCOGS,
+        },
+      ],
+    };
+  }
+
+  let availableLayers = [];
+  try {
+    // 1. Fetch available layers ordered by receivedDate ASC, id ASC
+    availableLayers = await tx.inventoryCostLayer.findMany({
+      where: {
+        productId,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: [
+        { receivedDate: "asc" },
+        { id: "asc" },
+      ],
+    });
+  } catch (err) {
+    // If InventoryCostLayer table does not exist in production DB, gracefully fallback to product.costPrice
+    if (err.code === "P2021" || err.message?.includes("does not exist")) {
+      availableLayers = [];
+    } else {
+      throw err;
+    }
+  }
 
   let remainingNeeded = quantity;
   let totalCOGS = 0;
@@ -123,15 +182,22 @@ async function restoreFIFOCost(
   const tx = txClient || prisma;
   if (quantity <= 0) return null;
 
-  return tx.inventoryCostLayer.create({
-    data: {
-      productId,
-      initialQuantity: quantity,
-      remainingQuantity: quantity,
-      unitCost: Number(unitCost),
-      receivedDate,
-    },
-  });
+  const hasTable = await checkInventoryCostLayerSupport();
+  if (!hasTable) return null;
+
+  try {
+    return await tx.inventoryCostLayer.create({
+      data: {
+        productId,
+        initialQuantity: quantity,
+        remainingQuantity: quantity,
+        unitCost: Number(unitCost),
+        receivedDate,
+      },
+    });
+  } catch (err) {
+    return null;
+  }
 }
 
 /**
@@ -139,6 +205,20 @@ async function restoreFIFOCost(
  */
 async function getInventoryValuation(productId = null, txClient) {
   const tx = txClient || prisma;
+  const hasTable = await checkInventoryCostLayerSupport();
+
+  if (!hasTable) {
+    const prods = await tx.product.findMany({
+      where: productId ? { id: productId } : {},
+      select: { stockQuantity: true, costPrice: true },
+    });
+    const totalValuation = prods.reduce((sum, p) => sum + (p.stockQuantity * Number(p.costPrice || 0)), 0);
+    return {
+      totalValuation: Math.round(totalValuation * 100) / 100,
+      layers: [],
+    };
+  }
+
   const where = { remainingQuantity: { gt: 0 } };
   if (productId) where.productId = productId;
 
