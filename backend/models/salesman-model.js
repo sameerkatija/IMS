@@ -1,10 +1,12 @@
 const prisma = require('../config/prisma');
 
-const getAllSalesman = ({ where = {}, skip = 0, take = 10 }) => {
+const getAllSalesman = ({ where = {}, skip = 0, take = 50000 } = {}) => {
+    const safeSkip = typeof skip === "number" && !isNaN(skip) && skip >= 0 ? skip : 0;
+    const safeTake = typeof take === "number" && !isNaN(take) && take > 0 ? take : 50000;
     return prisma.salesman.findMany({
         where,
-        skip,
-        take,
+        skip: safeSkip,
+        take: safeTake,
         orderBy: {
             createdAt: "desc",
         },

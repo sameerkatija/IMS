@@ -3,9 +3,10 @@ const productCategory = require("../models/product-category-model");
 const getAll = async (req, res) => {
     try {
 
-        const page = Number(req.query.page || 1);
-        const limit = req.query.limit === "all" ? 50000 : Number(req.query.limit || 10);
-        const skip = req.query.limit === "all" ? 0 : (page - 1) * limit;
+        const isAll = req.query.limit === "all";
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = isAll ? 50000 : Math.max(1, Number(req.query.limit) || 10);
+        const skip = isAll ? 0 : (page - 1) * limit;
 
         const where = {};
 
