@@ -41,9 +41,8 @@ const getAllCustomers = async (req, res) => {
             }
         }
 
-        const skip = req.query.limit === "all" ? 0 : (page - 1) * limit;
-        const orderBy = req.query.sortBy === "name" 
-            ? { name: "asc" } 
+        const orderBy = req.query.sortBy === "name"
+            ? { name: "asc" }
             : { createdAt: "desc" };
 
         const [customers, total] = await Promise.all([
