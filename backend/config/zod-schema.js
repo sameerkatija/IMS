@@ -477,6 +477,8 @@ exports.createInvoiceSchema = z.object({
         .nonnegative({ message: "Discount must be a non-negative number." })
         .default(0)
         .optional(),
+      discountType: z.enum(["PER_PIECE", "%", "PKR"]).optional(),
+      discountValue: z.coerce.number().optional(),
     })
   ).nonempty({ message: "Invoice must contain at least one item." }),
 });
@@ -548,6 +550,8 @@ exports.updateInvoiceSchema = z.object({
         .nonnegative({ message: "Discount must be a non-negative number." })
         .default(0)
         .optional(),
+      discountType: z.enum(["PER_PIECE", "%", "PKR"]).optional(),
+      discountValue: z.coerce.number().optional(),
     })
   ).nonempty({ message: "Invoice must contain at least one item." }),
 });

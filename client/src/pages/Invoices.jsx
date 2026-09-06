@@ -284,8 +284,10 @@ const Invoices = () => {
               productId: it.productId.toString(),
               quantity: it.quantity.toString(),
               unitPrice: it.unitPrice.toString(),
-              discountType: "PKR",
-              discountValue: itemDisc.toString(),
+              discountType: it.discountType || "PER_PIECE",
+              discountValue: it.discountValue !== undefined && it.discountValue !== null
+                ? it.discountValue.toString()
+                : (qty > 0 ? (itemDisc / qty).toString() : "0"),
             };
           });
           setItems(loadedItems);
@@ -367,6 +369,8 @@ const Invoices = () => {
             quantity: Number(it.quantity),
             unitPrice: Number(it.unitPrice),
             discount: lineDiscount,
+            discountType: it.discountType || "PER_PIECE",
+            discountValue: Number(it.discountValue || 0),
           };
         })
       };
@@ -1683,17 +1687,12 @@ const Invoices = () => {
                     <span>Subtotal:</span>
                     <span>Rs. {formatCurrencyNoDecimals(selectedInvoice.subtotal)}</span>
                   </div>
-                  {Number(selectedInvoice.discount) > 0 && (() => {
-                    const discPct = Number(selectedInvoice.subtotal) > 0
-                      ? ((Number(selectedInvoice.discount) / Number(selectedInvoice.subtotal)) * 100).toFixed(1)
-                      : null;
-                    return (
-                      <div className="flex justify-between text-rose-500">
-                        <span>Discount{discPct ? ` (${discPct}%)` : ''}:</span>
-                        <span>-Rs. {formatCurrencyNoDecimals(selectedInvoice.discount)}</span>
-                      </div>
-                    );
-                  })()}
+                  {Number(selectedInvoice.discount) > 0 && (
+                    <div className="flex justify-between text-rose-500">
+                      <span>Discount:</span>
+                      <span>-Rs. {formatCurrencyNoDecimals(selectedInvoice.discount)}</span>
+                    </div>
+                  )}
                   {Number(selectedInvoice.transportDiscount) > 0 ? (
                     <>
                       <div className="flex justify-between font-bold border-t border-dashed border-slate-200 dark:border-slate-800 print:border-slate-300 pt-0.5">
@@ -1774,41 +1773,84 @@ const Invoices = () => {
                 </div>
 
                 {/* ===== ITEMS TABLE ===== */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '11px' }}>
-                  <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-800 border-t border-b border-slate-900 dark:border-slate-200 print:border-black">
-                      <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">TP Rate</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc %</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc Amt</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Net Rate</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
-                      <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedInvoice.items?.map((item, idx) => {
-                      const tpRate = Number(item.unitPrice);
-                      const lineTotal = tpRate * item.quantity;
-                      const discAmt = Math.max(0, lineTotal - Number(item.totalPrice));
-                      const discPct = lineTotal > 0 ? (discAmt / lineTotal) * 100 : 0;
-                      const netRate = Number(item.totalPrice) / (item.quantity || 1);
-                      return (
-                        <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
-                          <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
-                          <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(tpRate)}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{discAmt > 0 ? `${discPct.toFixed(0)}%` : '0%'}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(discAmt)}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(netRate)}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(lineTotal)}</td>
+                {(() => {
+                  const itemsWithDiscountInfo = (selectedInvoice.items || []).map((item) => {
+                    const tpRate = Number(item.unitPrice);
+                    const lineTotal = tpRate * item.quantity;
+                    const discAmt = Math.max(0, lineTotal - Number(item.totalPrice));
+                    const netRate = item.quantity > 0 ? Number(item.totalPrice) / item.quantity : tpRate;
+
+                    let isPercentDiscount = false;
+                    let discPctDisplay = "";
+
+                    if (item.discountType === "%" && Number(item.discountValue) > 0) {
+                      isPercentDiscount = true;
+                      discPctDisplay = `${Number(item.discountValue)}%`;
+                    } else if (item.discountType && item.discountType !== "%") {
+                      isPercentDiscount = false;
+                    } else if (discAmt > 0 && lineTotal > 0) {
+                      // Fallback detection for legacy invoices without stored discountType:
+                      // Only treat as percentage if discAmt matches an exact clean integer percentage
+                      const rawPct = (discAmt / lineTotal) * 100;
+                      const roundedPct = Math.round(rawPct);
+                      const isCleanIntegerPct = Math.abs(rawPct - roundedPct) < 0.001;
+                      const calculatedAmtFromPct = Math.round(((lineTotal * roundedPct) / 100) * 100) / 100;
+                      if (isCleanIntegerPct && Math.abs(calculatedAmtFromPct - discAmt) < 0.01) {
+                        isPercentDiscount = true;
+                        discPctDisplay = `${roundedPct}%`;
+                      }
+                    }
+
+                    return {
+                      ...item,
+                      tpRate,
+                      lineTotal,
+                      discAmt,
+                      netRate,
+                      isPercentDiscount,
+                      discPctDisplay,
+                    };
+                  });
+
+                  const hasPercentDiscount = itemsWithDiscountInfo.some(it => it.isPercentDiscount);
+
+                  return (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '11px' }}>
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-slate-800 border-t border-b border-slate-900 dark:border-slate-200 print:border-black">
+                          <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Product ID</th>
+                          <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Item</th>
+                          <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">TP Rate</th>
+                          {hasPercentDiscount && (
+                            <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc %</th>
+                          )}
+                          <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Disc Amt</th>
+                          <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Net Rate</th>
+                          <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }} className="border-r border-slate-300 dark:border-slate-700 print:border-slate-300">Qty</th>
+                          <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>Total</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {itemsWithDiscountInfo.map((item, idx) => (
+                          <tr key={item.id || idx} className="border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
+                            <td style={{ padding: '5px 6px', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{String(idx + 1).padStart(3, '0')}</td>
+                            <td style={{ padding: '5px 6px', textTransform: 'uppercase', fontWeight: '500' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.product?.name}{item.product?.size ? ` (${item.product.size})` : ""}</td>
+                            <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(item.tpRate)}</td>
+                            {hasPercentDiscount && (
+                              <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">
+                                {item.isPercentDiscount ? item.discPctDisplay : '-'}
+                              </td>
+                            )}
+                            <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(item.discAmt)}</td>
+                            <td style={{ padding: '5px 6px', textAlign: 'right' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{formatCurrency(item.netRate)}</td>
+                            <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '600' }} className="border-r border-slate-200 dark:border-slate-800 print:border-slate-200">{item.quantity}</td>
+                            <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(item.lineTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
 
                 {/* ===== SUMMARY SECTION ===== */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
@@ -1817,17 +1859,12 @@ const Invoices = () => {
                       <span>Items Subtotal:</span>
                       <span style={{ fontWeight: '700' }}>PKR {formatCurrency(Number(selectedInvoice.subtotal))}</span>
                     </div>
-                    {Number(selectedInvoice.discount) > 0 && (() => {
-                      const discPct = Number(selectedInvoice.subtotal) > 0
-                        ? ((Number(selectedInvoice.discount) / Number(selectedInvoice.subtotal)) * 100).toFixed(1)
-                        : null;
-                      return (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                          <span>Invoice Discount{discPct ? ` (${discPct}%)` : ''}:</span>
-                          <span style={{ fontWeight: '600' }}>PKR {formatCurrency(Number(selectedInvoice.discount || 0))}</span>
-                        </div>
-                      );
-                    })()}
+                    {Number(selectedInvoice.discount) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                        <span>Invoice Discount:</span>
+                        <span style={{ fontWeight: '600' }}>PKR {formatCurrency(Number(selectedInvoice.discount || 0))}</span>
+                      </div>
+                    )}
                     {Number(selectedInvoice.transportDiscount) > 0 ? (
                       <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>

@@ -392,6 +392,60 @@ async function postInvoiceFinancialsAndStock(tx, invoice, validatedItems, { cust
   );
 }
 
+// Helper: pack user description and item discount metadata without altering DB schema
+function packDescription(userDescription, items) {
+  const itemDiscounts = (items || [])
+    .filter((it) => it.discountType)
+    .map((it) => ({
+      productId: Number(it.productId),
+      discountType: it.discountType,
+      discountValue: it.discountValue !== undefined ? Number(it.discountValue) : undefined,
+    }));
+
+  if (itemDiscounts.length === 0) {
+    return userDescription || null;
+  }
+
+  return JSON.stringify({
+    note: userDescription || "",
+    itemDiscounts,
+  });
+}
+
+// Helper: unpack item discount metadata from invoice description
+function unpackInvoiceData(invoice) {
+  if (!invoice) return invoice;
+  let note = invoice.description;
+  const itemDiscountsMap = {};
+
+  if (invoice.description) {
+    try {
+      const parsed = JSON.parse(invoice.description);
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.itemDiscounts)) {
+        note = parsed.note || null;
+        parsed.itemDiscounts.forEach((d) => {
+          itemDiscountsMap[d.productId] = d;
+        });
+      }
+    } catch {}
+  }
+
+  const items = (invoice.items || []).map((item) => {
+    const meta = itemDiscountsMap[item.productId];
+    return {
+      ...item,
+      discountType: meta ? meta.discountType : undefined,
+      discountValue: meta ? meta.discountValue : undefined,
+    };
+  });
+
+  return {
+    ...invoice,
+    description: note,
+    items,
+  };
+}
+
 /**
  * Creates a sales invoice transaction atomically.
  * Supports documentStatus: "DRAFT" or "POSTED".
@@ -465,7 +519,7 @@ async function createInvoice({
         balanceDue,
         status,
         documentStatus,
-        description,
+        description: packDescription(description, items),
         createdById,
       },
     });
@@ -498,7 +552,7 @@ async function createInvoice({
       });
     }
 
-    return invoice;
+    return unpackInvoiceData(invoice);
   });
 }
 
@@ -593,7 +647,9 @@ async function updateInvoice(id, {
         balanceDue,
         status,
         documentStatus: documentStatus || "DRAFT",
-        description: description !== undefined ? description : existing.description,
+        description: description !== undefined
+          ? packDescription(description, items)
+          : (items ? packDescription(existing.description, items) : existing.description),
       },
     });
 
@@ -625,7 +681,7 @@ async function updateInvoice(id, {
       });
     }
 
-    return updatedInvoice;
+    return unpackInvoiceData(updatedInvoice);
   });
 }
 
@@ -847,6 +903,7 @@ function getInvoiceById(id) {
       },
     },
   });
+  return unpackInvoiceData(invoice);
 }
 
 module.exports = {
