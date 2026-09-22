@@ -67,10 +67,45 @@ async function salesByDay(req, res) {
   }
 }
 
+async function salesByMonth(req, res) {
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const from = req.query.from ? new Date(req.query.from) : new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0, 0));
+    const to = req.query.to ? new Date(req.query.to) : new Date(Date.UTC(currentYear, 11, 31, 23, 59, 59, 999));
+
+    const data = await reportModel.salesByMonth(from, to);
+    return res.status(200).json({
+      type: "success",
+      data,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      type: "error",
+      message: err.message || "Failed to retrieve monthly sales report.",
+    });
+  }
+}
+
 async function salesBySalesman(req, res) {
   try {
-    const { from, to } = getFromToDates(req);
-    const data = await reportModel.salesBySalesman(from, to);
+    const { from, to, isActive } = req.query;
+    let fromDate, toDate;
+
+    if (from && to) {
+      const dates = getFromToDates(req);
+      fromDate = dates.from;
+      toDate = dates.to;
+    } else {
+      // Default to monthly sales: from 1st of current month till today end-of-day
+      const now = new Date();
+      fromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+      toDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    }
+
+    const isActiveFilter = isActive !== undefined ? isActive === "true" : true;
+    const data = await reportModel.salesBySalesman(fromDate, toDate, { isActive: isActiveFilter });
     return res.status(200).json({
       type: "success",
       data,
@@ -275,6 +310,7 @@ module.exports = {
   getDailySummary: getSummary,
   dailySummary: getSummary,
   salesByDay,
+  salesByMonth,
   salesBySalesman,
   purchasesByDay,
   currentStockReport,

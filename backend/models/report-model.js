@@ -287,39 +287,96 @@ async function salesByDay(from, to, customerId) {
 }
 
 /**
- * Returns net salesman sales total (gross minus returns) in the period.
+ * Returns total invoices volume grouped by month for yearly trends.
  */
-async function salesBySalesman(from, to) {
+async function salesByMonth(from, to) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const rows = await prisma.$queryRaw`
+  const result = await prisma.$queryRaw`
     SELECT 
-      s.id AS "salesmanId", 
-      s.name AS "salesmanName",
-      COALESCE(i.gross, 0)::numeric AS gross,
-      COALESCE(r.returns, 0)::numeric AS returns,
-      (COALESCE(i.gross, 0) - COALESCE(r.returns, 0))::numeric AS net
-    FROM "Salesman" s
-    LEFT JOIN (
-      SELECT "salesmanId", SUM(total) AS gross
-      FROM "Invoice"
-      WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
-      GROUP BY "salesmanId"
-    ) i ON s.id = i."salesmanId"
-    LEFT JOIN (
-      SELECT inv."salesmanId", SUM(ret."totalAmount") AS returns
-      FROM "SalesReturn" ret
-      JOIN "Invoice" inv ON ret."invoiceId" = inv.id
-      WHERE ret."returnDate" >= ${fromDate} AND ret."returnDate" <= ${toDate}
-      GROUP BY inv."salesmanId"
-    ) r ON s.id = r."salesmanId"
-    ORDER BY net DESC
+      DATE_TRUNC('month', "invoiceDate")::date AS date,
+      COUNT(*)::int AS count,
+      COALESCE(SUM(total), 0)::numeric AS total
+    FROM "Invoice"
+    WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
+    GROUP BY DATE_TRUNC('month', "invoiceDate")::date
+    ORDER BY date ASC
   `;
+
+  return result.map((r) => ({
+    date: r.date,
+    count: r.count,
+    total: Number(r.total),
+  }));
+}
+
+/**
+ * Returns net salesman sales total (gross minus returns) in the period.
+ */
+async function salesBySalesman(from, to, { isActive = true } = {}) {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  let rows;
+  if (isActive !== null && isActive !== undefined) {
+    const activeBool = Boolean(isActive);
+    rows = await prisma.$queryRaw`
+      SELECT 
+        s.id AS "salesmanId", 
+        s.name AS "salesmanName",
+        s."isActive",
+        COALESCE(i.gross, 0)::numeric AS gross,
+        COALESCE(r.returns, 0)::numeric AS returns,
+        (COALESCE(i.gross, 0) - COALESCE(r.returns, 0))::numeric AS net
+      FROM "Salesman" s
+      LEFT JOIN (
+        SELECT "salesmanId", SUM(total) AS gross
+        FROM "Invoice"
+        WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
+        GROUP BY "salesmanId"
+      ) i ON s.id = i."salesmanId"
+      LEFT JOIN (
+        SELECT inv."salesmanId", SUM(ret."totalAmount") AS returns
+        FROM "SalesReturn" ret
+        JOIN "Invoice" inv ON ret."invoiceId" = inv.id
+        WHERE ret."returnDate" >= ${fromDate} AND ret."returnDate" <= ${toDate}
+        GROUP BY inv."salesmanId"
+      ) r ON s.id = r."salesmanId"
+      WHERE s."isActive" = ${activeBool}
+      ORDER BY net DESC
+    `;
+  } else {
+    rows = await prisma.$queryRaw`
+      SELECT 
+        s.id AS "salesmanId", 
+        s.name AS "salesmanName",
+        s."isActive",
+        COALESCE(i.gross, 0)::numeric AS gross,
+        COALESCE(r.returns, 0)::numeric AS returns,
+        (COALESCE(i.gross, 0) - COALESCE(r.returns, 0))::numeric AS net
+      FROM "Salesman" s
+      LEFT JOIN (
+        SELECT "salesmanId", SUM(total) AS gross
+        FROM "Invoice"
+        WHERE "invoiceDate" >= ${fromDate} AND "invoiceDate" <= ${toDate}
+        GROUP BY "salesmanId"
+      ) i ON s.id = i."salesmanId"
+      LEFT JOIN (
+        SELECT inv."salesmanId", SUM(ret."totalAmount") AS returns
+        FROM "SalesReturn" ret
+        JOIN "Invoice" inv ON ret."invoiceId" = inv.id
+        WHERE ret."returnDate" >= ${fromDate} AND ret."returnDate" <= ${toDate}
+        GROUP BY inv."salesmanId"
+      ) r ON s.id = r."salesmanId"
+      ORDER BY net DESC
+    `;
+  }
 
   return rows.map(r => ({
     salesmanId: r.salesmanId,
     salesmanName: r.salesmanName,
+    isActive: r.isActive,
     gross: Number(r.gross),
     returns: Number(r.returns),
     net: Number(r.net)
@@ -1000,6 +1057,7 @@ module.exports = {
   getSummary,
   getDailySummary,
   salesByDay,
+  salesByMonth,
   salesBySalesman,
   purchasesByDay,
   currentStockReport,

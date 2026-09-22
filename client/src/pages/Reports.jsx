@@ -1031,7 +1031,7 @@ const Reports = () => {
               </div>
 
               {/* Printable Closing Statement (Clean Layout for A4 / Thermal Printing) */}
-              <div className="print-area hidden print:block">
+              <div className="print-area summary-print-container hidden print:block">
                 <div className="space-y-5 text-black bg-white print:p-0">
                   {/* Print Sheet Header & Metrics Grid */}
                   <div className="break-inside-avoid print-header-block space-y-4">
@@ -1618,7 +1618,9 @@ const Reports = () => {
                     className="px-2.5 py-1 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg outline-none font-semibold"
                   >
                     {allCustomers.map((cust) => (
-                      <option key={cust.id} value={cust.id}>{cust.name}</option>
+                      <option key={cust.id} value={cust.id}>
+                        {cust.name}{cust.address ? ` — ${cust.address}` : cust.phone ? ` — ${cust.phone}` : ""}
+                      </option>
                     ))}
                   </select>
 

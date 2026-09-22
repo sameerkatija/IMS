@@ -76,9 +76,9 @@ const InvoiceDetailModal = ({ isOpen, onClose, invoiceId, initialInvoice = null 
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto print-modal">
       <div
-        className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full p-6 shadow-2xl space-y-6 ${
+        className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full p-6 shadow-2xl space-y-6 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full ${
           printFormat === "thermal" ? "max-w-sm thermal-receipt font-mono" : "max-w-2xl font-sans"
         }`}
       >

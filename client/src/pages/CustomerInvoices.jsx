@@ -176,7 +176,7 @@ const CustomerInvoices = () => {
             >
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
-                  #{c.id} - {c.name}
+                  #{c.id} - {c.name}{c.address ? ` (${c.address})` : c.phone ? ` (${c.phone})` : ""}
                 </option>
               ))}
             </select>
@@ -273,7 +273,7 @@ const CustomerInvoices = () => {
       </div>
 
       {/* Main Printable / Viewable Sheet Container ("Like the ledger") */}
-      <div className="print-area bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6 print:border-none print:shadow-none">
+      <div className={`print-area bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6 print:border-none print:shadow-none ${isModalOpen ? 'no-print print:hidden' : ''}`}>
         {/* Document Header */}
         <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>

@@ -73,12 +73,42 @@ html.dark ::-webkit-scrollbar-thumb {
     font-family: Arial, sans-serif;
     color: #475569;
   }
+}
+
+@page summary-page {
+  size: A4 portrait;
+  margin: 10mm 8mm 12mm 8mm;
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt;
+    font-family: Arial, sans-serif;
+    color: #475569;
+  }
   @bottom-left {
     content: "Sameer Distributors • Sales Summary Statement";
     font-size: 8pt;
     font-family: Arial, sans-serif;
     color: #94a3b8;
   }
+}
+
+@page thermal-page {
+  size: 80mm auto;
+  margin: 0;
+  @bottom-right {
+    content: none;
+  }
+  @bottom-left {
+    content: none;
+  }
+}
+
+.summary-print-container {
+  page: summary-page;
+}
+
+.thermal-receipt {
+  page: thermal-page;
 }
 
 @media print {
@@ -120,6 +150,24 @@ html.dark ::-webkit-scrollbar-thumb {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
+  }
+
+  /* When any print-modal is active, hide all other page content outside of it */
+  body:has(.print-modal) main > *:not(:has(.print-modal)),
+  body:has(.print-modal) .print-area:not(.print-modal *) {
+    display: none !important;
+  }
+
+  .print-modal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   /* Completely remove non-printed UI elements from document flow */
@@ -184,7 +232,6 @@ html.dark ::-webkit-scrollbar-thumb {
   .print-area table th,
   .print-area table td {
     color: #000 !important;
-    border-color: #000 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

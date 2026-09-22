@@ -12,6 +12,9 @@ router.get("/daily-summary", reportController.dailySummary);
 // Daily sales reports
 router.get("/sales", reportController.salesByDay);
 
+// Monthly aggregated sales reports (for yearly view)
+router.get("/sales-by-month", reportController.salesByMonth);
+
 // Leaderboard sales reports by salesman
 router.get("/sales-by-salesman", reportController.salesBySalesman);
 

@@ -54,13 +54,13 @@ export default function GeneralLedger() {
     setError("");
     try {
       if (activeTab === "trial-balance") {
-        const res = await api.get("/gl/trial-balance", { params: { from: fromDate, to: toDate } });
+        const res = await api.get("/api/gl/trial-balance", { params: { from: fromDate, to: toDate } });
         setTrialBalance(res.data?.data || { accounts: [], totalDebit: 0, totalCredit: 0, isBalanced: true });
       } else if (activeTab === "profit-loss") {
-        const res = await api.get("/gl/profit-loss", { params: { from: fromDate, to: toDate } });
+        const res = await api.get("/api/gl/profit-loss", { params: { from: fromDate, to: toDate } });
         setProfitAndLoss(res.data?.data || null);
       } else if (activeTab === "journal-entries") {
-        const res = await api.get("/gl/journal-entries", {
+        const res = await api.get("/api/gl/journal-entries", {
           params: { from: fromDate, to: toDate, referenceType: referenceTypeFilter, page: journalPage, limit: 30 },
         });
         setJournalEntries(res.data?.data || { entries: [], total: 0 });
@@ -83,13 +83,13 @@ export default function GeneralLedger() {
 
     try {
       if (type === "deposit" || type === "credit-note") {
-        const res = await api.get("/customer");
+        const res = await api.get("/api/customer?limit=all&isActive=true&sortBy=name");
         setCustomers(res.data.data || []);
       } else if (type === "debit-note") {
-        const res = await api.get("/supplier");
+        const res = await api.get("/api/supplier?limit=all&isActive=true");
         setSuppliers(res.data.data || []);
       } else if (type === "write-off") {
-        const res = await api.get("/invoice", { params: { status: "UNPAID" } });
+        const res = await api.get("/api/invoice", { params: { status: "UNPAID" } });
         setUnpaidInvoices(res.data.data || []);
       }
     } catch (err) {
@@ -105,16 +105,16 @@ export default function GeneralLedger() {
 
     try {
       if (modalType === "deposit") {
-        await api.post("/gl/customer-deposit", { customerId: formCustomerId, amount: formAmount, description: formReason });
+        await api.post("/api/gl/customer-deposit", { customerId: formCustomerId, amount: formAmount, description: formReason });
         setSuccessMsg("Customer deposit posted successfully to GL!");
       } else if (modalType === "credit-note") {
-        await api.post("/gl/credit-note", { customerId: formCustomerId, invoiceId: formInvoiceId || null, amount: formAmount, reason: formReason });
+        await api.post("/api/gl/credit-note", { customerId: formCustomerId, invoiceId: formInvoiceId || null, amount: formAmount, reason: formReason });
         setSuccessMsg("Credit note issued successfully!");
       } else if (modalType === "debit-note") {
-        await api.post("/gl/debit-note", { supplierId: formSupplierId, purchaseId: formInvoiceId || null, amount: formAmount, reason: formReason });
+        await api.post("/api/gl/debit-note", { supplierId: formSupplierId, purchaseId: formInvoiceId || null, amount: formAmount, reason: formReason });
         setSuccessMsg("Debit note issued successfully!");
       } else if (modalType === "write-off") {
-        await api.post("/gl/bad-debt-writeoff", { invoiceId: formInvoiceId, reason: formReason });
+        await api.post("/api/gl/bad-debt-writeoff", { invoiceId: formInvoiceId, reason: formReason });
         setSuccessMsg("Bad debt written off cleanly!");
       }
       setModalType(null);
@@ -443,7 +443,7 @@ export default function GeneralLedger() {
                     <option value="">Choose Customer...</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} (Bal: Rs. {Number(c.balance).toFixed(2)})
+                        {c.name}{c.address ? ` — ${c.address}` : c.phone ? ` — ${c.phone}` : ""} (Bal: Rs. {Number(c.balance).toFixed(2)})
                       </option>
                     ))}
                   </select>
@@ -462,7 +462,7 @@ export default function GeneralLedger() {
                     <option value="">Choose Supplier...</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} (Bal: Rs. {Number(s.balance).toFixed(2)})
+                        {s.name}{s.address ? ` — ${s.address}` : s.phone ? ` — ${s.phone}` : ""} (Bal: Rs. {Number(s.balance).toFixed(2)})
                       </option>
                     ))}
                   </select>

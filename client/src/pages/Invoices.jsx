@@ -516,8 +516,9 @@ const Invoices = () => {
     <div className="space-y-6">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className={`space-y-6 ${isDetailOpen ? "no-print print:hidden" : ""}`}>
+        {/* Header Panel */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center">
             <Receipt className="mr-2 text-sky-600 dark:text-sky-400" /> Sales Invoices
@@ -707,27 +708,31 @@ const Invoices = () => {
                         const bal = Number(selectedCust.balance || 0);
                         return (
                           <div className="flex items-center justify-between px-3 py-1.5 bg-white dark:bg-slate-950 border border-sky-300 dark:border-sky-800 rounded-xl shadow-xs min-h-[42px]">
-                            <div className="min-w-0 pr-2">
+                            <div className="min-w-0 pr-2 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                <span className="font-bold text-sm text-slate-900 dark:text-white break-words leading-tight">
                                   {selectedCust.name}
                                 </span>
                                 {bal > 0 ? (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 whitespace-nowrap">
                                     Due: Rs. {formatCurrencyNoDecimals(bal)}
                                   </span>
                                 ) : bal < 0 ? (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 whitespace-nowrap">
                                     Credit: Rs. {formatCurrencyNoDecimals(Math.abs(bal))}
                                   </span>
                                 ) : (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 whitespace-nowrap">
                                     Rs. 0
                                   </span>
                                 )}
                               </div>
-                              {selectedCust.phone && (
-                                <div className="text-[10px] text-slate-400 mt-0.5">Ph: {selectedCust.phone}</div>
+                              {(selectedCust.phone || selectedCust.address) && (
+                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                  {selectedCust.phone && <span>Ph: {selectedCust.phone}</span>}
+                                  {selectedCust.phone && selectedCust.address && <span>•</span>}
+                                  {selectedCust.address && <span className="text-slate-500 dark:text-slate-400">{selectedCust.address}</span>}
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -763,7 +768,7 @@ const Invoices = () => {
                             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <input
                               type="text"
-                              placeholder="Search by name or phone (or Walk-In)..."
+                              placeholder="Search by name, phone or address..."
                               value={isCustomerDropdownOpen ? customerSearchQuery : (customerId ? (selectedCust?.name || "") : "")}
                               onFocus={() => {
                                 setIsCustomerDropdownOpen(true);
@@ -780,8 +785,8 @@ const Invoices = () => {
 
                           {isCustomerDropdownOpen && (
                             <>
-                              <div className="fixed inset-0 z-20" onClick={() => setIsCustomerDropdownOpen(false)} />
-                              <div className="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-30 divide-y divide-slate-100 dark:divide-slate-800">
+                              <div className="fixed inset-0 z-40" onClick={() => setIsCustomerDropdownOpen(false)} />
+                              <div className="absolute left-0 w-[420px] sm:w-[480px] max-w-[calc(92vw-2rem)] mt-1 max-h-80 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 divide-y divide-slate-100 dark:divide-slate-800">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -789,7 +794,7 @@ const Invoices = () => {
                                     setIsCustomerDropdownOpen(false);
                                     setCustomerSearchQuery("");
                                   }}
-                                  className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${!customerId ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-300"}`}
+                                  className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${!customerId ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-300"}`}
                                 >
                                   <div>
                                     <span className="font-semibold block">Walk-In (Counter Cash)</span>
@@ -802,7 +807,11 @@ const Invoices = () => {
                                   const q = customerSearchQuery.toLowerCase().trim();
                                   const filtered = customers.filter(c => {
                                     if (!q) return true;
-                                    return (c.name || "").toLowerCase().includes(q) || (c.phone || "").includes(q);
+                                    return (
+                                      (c.name || "").toLowerCase().includes(q) ||
+                                      (c.phone || "").includes(q) ||
+                                      (c.address || "").toLowerCase().includes(q)
+                                    );
                                   });
 
                                   if (filtered.length === 0) {
@@ -825,25 +834,31 @@ const Invoices = () => {
                                           setIsCustomerDropdownOpen(false);
                                           setCustomerSearchQuery("");
                                         }}
-                                        className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${isSelected ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`}
+                                        className={`w-full text-left px-3.5 py-2.5 text-xs flex items-start justify-between gap-3 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors ${isSelected ? "bg-sky-50/80 dark:bg-sky-950/60 font-bold text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`}
                                       >
-                                        <div className="min-w-0 pr-2">
-                                          <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                        <div className="min-w-0 flex-1">
+                                          <span className="font-bold text-slate-900 dark:text-white block whitespace-normal break-words text-sm leading-snug">
                                             {c.name}
                                           </span>
-                                          {c.phone && <span className="text-[10px] text-slate-400 block">{c.phone}</span>}
+                                          {(c.phone || c.address) && (
+                                            <div className="text-[11px] text-slate-400 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                              {c.phone && <span>Ph: {c.phone}</span>}
+                                              {c.phone && c.address && <span className="text-slate-300 dark:text-slate-600">•</span>}
+                                              {c.address && <span className="text-slate-500 dark:text-slate-400">{c.address}</span>}
+                                            </div>
+                                          )}
                                         </div>
-                                        <div className="shrink-0 text-right">
+                                        <div className="shrink-0 text-right pt-0.5">
                                           {bal > 0 ? (
-                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900">
+                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900 whitespace-nowrap">
                                               Due: Rs. {formatCurrencyNoDecimals(bal)}
                                             </span>
                                           ) : bal < 0 ? (
-                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900 whitespace-nowrap">
                                               Credit: Rs. {formatCurrencyNoDecimals(Math.abs(bal))}
                                             </span>
                                           ) : (
-                                            <span className="text-[10px] text-slate-400">Rs. 0</span>
+                                            <span className="text-[10px] text-slate-400 whitespace-nowrap">Rs. 0</span>
                                           )}
                                         </div>
                                       </button>
@@ -1717,11 +1732,12 @@ const Invoices = () => {
           </div>
         )}
       </div>
+      </div>
 
       {/* Invoice Detail & Receipt Modal */}
       {isDetailOpen && selectedInvoice && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full p-6 shadow-xl space-y-6 ${printFormat === "thermal" ? "max-w-sm thermal-receipt font-mono" : "max-w-2xl font-sans"}`}>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto print-modal">
+          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full p-6 shadow-xl space-y-6 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full ${printFormat === "thermal" ? "max-w-sm thermal-receipt font-mono" : "max-w-2xl font-sans"}`}>
             {/* Header controls (no-print) */}
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 no-print">
               <div className="flex items-center gap-2">

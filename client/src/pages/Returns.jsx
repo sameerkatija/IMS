@@ -1049,8 +1049,8 @@ const Returns = () => {
 
       {/* Return Details/Receipt Modal */}
       {isDetailOpen && selectedReturnDetail && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-xl space-y-6">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print-modal">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-xl space-y-6 print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full">
             {/* Header controls */}
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 no-print">
               <h3 className="font-bold text-slate-900 dark:text-white capitalize">

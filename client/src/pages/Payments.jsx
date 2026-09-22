@@ -816,7 +816,7 @@ const Payments = () => {
                       <option value="">Select Customer...</option>
                       {customers.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} (Balance: Rs.{Number(c.balance).toFixed(0)})
+                          {c.name}{c.address ? ` — ${c.address}` : c.phone ? ` — ${c.phone}` : ""} (Balance: Rs.{Number(c.balance).toFixed(0)})
                         </option>
                       ))}
                     </select>
@@ -1065,7 +1065,7 @@ const Payments = () => {
                       <option value="">Select Customer...</option>
                       {customers.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} (Balance: Rs.{Number(c.balance).toFixed(0)})
+                          {c.name}{c.address ? ` — ${c.address}` : c.phone ? ` — ${c.phone}` : ""} (Balance: Rs.{Number(c.balance).toFixed(0)})
                         </option>
                       ))}
                     </select>
@@ -1193,7 +1193,7 @@ const Payments = () => {
                           .filter(c => Number(c.balance) < 0)
                           .map(c => (
                             <option key={c.id} value={c.id}>
-                              {c.name} — Credit: Rs. {Math.abs(Number(c.balance)).toFixed(0)}
+                              {c.name}{c.address ? ` — ${c.address}` : c.phone ? ` — ${c.phone}` : ""} — Credit: Rs. {Math.abs(Number(c.balance)).toFixed(0)}
                             </option>
                           ))}
                       </select>

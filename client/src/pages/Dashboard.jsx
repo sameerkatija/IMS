@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
-import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database, RotateCcw, Calendar } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
+import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database, RotateCcw, Calendar, BarChart3 } from "lucide-react";
 
 const COLORS = ["#0284c7", "#38bdf8", "#0ea5e9", "#7dd3fc", "#bae6fd"];
 
@@ -11,6 +11,8 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
+  const [monthlySalesTrend, setMonthlySalesTrend] = useState([]);
+  const [yearlySalesTrend, setYearlySalesTrend] = useState([]);
   const [salesmanData, setSalesmanData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
@@ -18,38 +20,96 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, salesRes, salesmanRes] = await Promise.all([
+      // Date calculations
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const firstOfMonth = `${yyyy}-${mm}-01`;
+      const firstOfYear = `${yyyy}-01-01`;
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      const [metricsRes, salesRes, monthlySalesRes, yearlySalesRes, salesmanRes] = await Promise.all([
         api.get("/api/report/dashboard"),
         api.get(`/api/report/sales`),
-        api.get(`/api/report/sales-by-salesman`)
+        api.get(`/api/report/sales?from=${firstOfMonth}&to=${todayStr}`),
+        api.get(`/api/report/sales-by-month?from=${firstOfYear}&to=${todayStr}`),
+        api.get(`/api/report/sales-by-salesman?from=${firstOfMonth}&to=${todayStr}&isActive=true`)
       ]);
 
       if (metricsRes.data?.type === "success") setMetrics(metricsRes.data.data);
+
+      // 1. Last 7 Days Daily Trend
       if (salesRes.data?.type === "success") {
-        // Format daily dates for charting e.g. 2026-07-16 -> 16 Jul
         const formattedSales = salesRes.data.data.map(item => {
-          // item.date is an ISO string like "2026-07-16" from Postgres DATE_TRUNC
-          const rawDate = item.date || item.day || item.invoiceDate;
+          const rawDate = String(item.date || item.day || item.invoiceDate || "");
           let label = rawDate;
           try {
-            // Force UTC parsing so "2026-07-16" becomes Jul 16, not shifted by timezone
-            const d = new Date(rawDate + "T00:00:00Z");
+            const cleanDateStr = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate;
+            const d = new Date(cleanDateStr + "T00:00:00Z");
             if (!isNaN(d.getTime())) {
               label = d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
             }
           } catch (_) {}
           return {
             name: label,
-            Sales: Number(item.total || item.totalSales || 0)
+            Sales: Number(item.total || item.totalSales || 0),
+            Invoices: Number(item.count || 0)
           };
         });
-        setSalesTrend(formattedSales); // chronological order
+        setSalesTrend(formattedSales);
       }
+
+      // 2. Current Month Daily Trend (1st till today)
+      if (monthlySalesRes.data?.type === "success") {
+        const formattedMonthly = monthlySalesRes.data.data.map(item => {
+          const rawDate = String(item.date || item.day || item.invoiceDate || "");
+          let label = rawDate;
+          try {
+            const cleanDateStr = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate;
+            const d = new Date(cleanDateStr + "T00:00:00Z");
+            if (!isNaN(d.getTime())) {
+              label = d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
+            }
+          } catch (_) {}
+          return {
+            name: label,
+            Sales: Number(item.total || item.totalSales || 0),
+            Invoices: Number(item.count || 0)
+          };
+        });
+        setMonthlySalesTrend(formattedMonthly);
+      }
+
+      // 3. Current Year Monthly Trend (Jan - Dec)
+      if (yearlySalesRes.data?.type === "success") {
+        const formattedYearly = yearlySalesRes.data.data.map(item => {
+          const rawDate = String(item.date || item.month || "");
+          let label = rawDate;
+          try {
+            const cleanDateStr = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate;
+            const d = new Date(cleanDateStr + "T00:00:00Z");
+            if (!isNaN(d.getTime())) {
+              label = d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+            }
+          } catch (_) {}
+          return {
+            name: label,
+            Sales: Number(item.total || 0),
+            Invoices: Number(item.count || 0)
+          };
+        });
+        setYearlySalesTrend(formattedYearly);
+      }
+
+      // 4. Salesman Leaderboard (active only)
       if (salesmanRes.data?.type === "success") {
-        const formattedSalesmen = salesmanRes.data.data.map(item => ({
-          name: item.salesmanName,
-          Sales: Number(item.net || item.gross || 0)
-        }));
+        const formattedSalesmen = salesmanRes.data.data
+          .filter(item => item.isActive !== false)
+          .map(item => ({
+            name: item.salesmanName,
+            Sales: Number(item.net || item.gross || 0)
+          }));
         setSalesmanData(formattedSalesmen);
       }
     } catch (err) {
@@ -100,6 +160,11 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  const currentMonthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const currentYear = new Date().getFullYear();
+  const monthlyTotal = monthlySalesTrend.reduce((sum, item) => sum + (item.Sales || 0), 0);
+  const yearlyTotal = yearlySalesTrend.reduce((sum, item) => sum + (item.Sales || 0), 0);
 
   // Key cards configuration
   const statCards = [
@@ -312,7 +377,7 @@ const Dashboard = () => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">Salesman Leaderboard</h3>
-            <p className="text-xs text-slate-400">Net revenue achievements by distribution salesmen</p>
+            <p className="text-xs text-slate-400">Monthly net sales (1st of month to date) for active salesmen</p>
           </div>
           <div className="h-72 text-xs font-semibold">
             {salesmanData.length === 0 ? (
@@ -325,6 +390,87 @@ const Dashboard = () => {
                   <YAxis stroke="#94a3b8" />
                   <Tooltip formatter={(value) => [`Rs. ${value.toLocaleString()}`, "Sales"]} />
                   <Bar dataKey="Sales" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly & Yearly Sales Analytics Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Sales Trend Chart (Current Month) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-sky-600 dark:text-sky-400" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  Monthly Sales Trend ({currentMonthName})
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">Daily billing breakdown from 1st of the month till date</p>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Month-to-Date Total</span>
+              <span className="text-sm font-bold font-mono text-sky-600 dark:text-sky-400">
+                Rs. {monthlyTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="h-72 text-xs font-semibold">
+            {monthlySalesTrend.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400">No sales recorded for this month.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlySalesTrend}>
+                  <defs>
+                    <linearGradient id="monthGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35}/>
+                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip formatter={(value) => [`Rs. ${Number(value).toLocaleString()}`, "Sales"]} />
+                  <Area type="monotone" dataKey="Sales" stroke="#0284c7" strokeWidth={2.5} fillOpacity={1} fill="url(#monthGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Yearly Sales Trend Chart (Current Year) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  Yearly Sales Trend ({currentYear})
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">Monthly aggregated revenue trajectory across {currentYear}</p>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Year-to-Date Total</span>
+              <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                Rs. {yearlyTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="h-72 text-xs font-semibold">
+            {yearlySalesTrend.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400">No sales recorded for this year.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={yearlySalesTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip formatter={(value) => [`Rs. ${Number(value).toLocaleString()}`, "Sales"]} />
+                  <Bar dataKey="Sales" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
