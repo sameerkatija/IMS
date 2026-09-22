@@ -5,6 +5,10 @@ const reportController = require("../controllers/report-controller");
 // Dashboard summary metrics
 router.get("/dashboard", reportController.getDashboardMetrics);
 
+// Sales & Products summary report (total sell & accumulative products sold)
+router.get("/summary", reportController.getSummary);
+router.get("/daily-summary", reportController.dailySummary);
+
 // Daily sales reports
 router.get("/sales", reportController.salesByDay);
 

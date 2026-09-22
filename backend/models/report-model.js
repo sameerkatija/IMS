@@ -44,10 +44,16 @@ async function getDashboardMetrics() {
     monthCashRefundAgg,
     monthPurchaseDiscountAgg,
     monthPaymentRefundAgg,
+    todayInvoiceItemsAgg,
+    todayReturnItemsAgg,
+    todayInvoicesCountAgg,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       _sum: { total: true },
-      where: { invoiceDate: { gte: todayStart, lte: todayEnd } },
+      where: {
+        invoiceDate: { gte: todayStart, lte: todayEnd },
+        documentStatus: { not: "VOIDED" },
+      },
     }),
     prisma.invoice.aggregate({
       _sum: { total: true },
@@ -125,6 +131,29 @@ async function getDashboardMetrics() {
         paymentType: "CASH_REFUND",
       },
     }),
+    prisma.invoiceItem.aggregate({
+      _sum: { quantity: true },
+      where: {
+        invoice: {
+          invoiceDate: { gte: todayStart, lte: todayEnd },
+          documentStatus: { not: "VOIDED" },
+        },
+      },
+    }),
+    prisma.salesReturnItem.aggregate({
+      _sum: { quantity: true },
+      where: {
+        salesReturn: {
+          returnDate: { gte: todayStart, lte: todayEnd },
+        },
+      },
+    }),
+    prisma.invoice.count({
+      where: {
+        invoiceDate: { gte: todayStart, lte: todayEnd },
+        documentStatus: { not: "VOIDED" },
+      },
+    }),
   ]);
 
   const todaySalesReturn = Number(todayReturnsAgg._sum.totalAmount || 0);
@@ -137,6 +166,11 @@ async function getDashboardMetrics() {
   const weekSales = Math.max(0, Number(weekSalesAgg._sum.total || 0) - weekSalesReturn);
   const monthSales = Math.max(0, Number(monthSalesAgg._sum.total || 0) - monthSalesReturn);
   const monthCashReceived = Math.max(0, Number(monthSalesAgg._sum.paidAmount || 0) - monthCashRefund);
+
+  const todayProductsSoldGross = Number(todayInvoiceItemsAgg._sum.quantity || 0);
+  const todayProductsReturned = Number(todayReturnItemsAgg._sum.quantity || 0);
+  const todayProductsSold = Math.max(0, todayProductsSoldGross - todayProductsReturned);
+  const todayInvoicesCount = todayInvoicesCountAgg || 0;
 
   const totalReceivables = Number(receivablesAgg._sum.balance || 0);
   const totalPayables = Number(payablesAgg._sum.balance || 0);
@@ -192,6 +226,10 @@ async function getDashboardMetrics() {
   return {
     todaySales,
     todaySalesReturn,
+    todayProductsSold,
+    todayProductsSoldGross,
+    todayProductsReturned,
+    todayInvoicesCount,
     weekSales,
     monthSales,
     monthSalesReturn,
@@ -639,8 +677,328 @@ async function salesByCategory(from, to) {
     .sort((a, b) => b.value - a.value);
 }
 
+/**
+ * Computes comprehensive Sales & Products Summary for a single date or date range.
+ * Defaults to today in Pakistan Standard Time (PKT, UTC+5).
+ * Supports: today, yesterday, custom date, custom date range, monthly, yearly.
+ */
+async function getSummary(params = {}) {
+  let from, to, date;
+  if (typeof params === "string") {
+    date = params;
+  } else if (params && typeof params === "object") {
+    from = params.from;
+    to = params.to;
+    date = params.date;
+  }
+
+  const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
+  let rangeStart, rangeEnd, targetDateStr;
+
+  const nowUtc = Date.now();
+  const nowPkt = new Date(nowUtc + PKT_OFFSET_MS);
+  const todayStr = `${nowPkt.getUTCFullYear()}-${String(nowPkt.getUTCMonth() + 1).padStart(2, "0")}-${String(nowPkt.getUTCDate()).padStart(2, "0")}`;
+
+  const fromVal = from || date;
+  const toVal = to || date;
+
+  if (fromVal && toVal) {
+    const [fy, fm, fd] = fromVal.split("-").map(Number);
+    const [ty, tm, td] = toVal.split("-").map(Number);
+    const startMs = Date.UTC(fy, fm - 1, fd) - PKT_OFFSET_MS;
+    const endMs = Date.UTC(ty, tm - 1, td, 23, 59, 59, 999) - PKT_OFFSET_MS;
+    rangeStart = new Date(startMs);
+    rangeEnd = new Date(endMs);
+    targetDateStr = fromVal === toVal ? fromVal : `${fromVal} to ${toVal}`;
+  } else if (fromVal) {
+    const [y, m, d] = fromVal.split("-").map(Number);
+    const startMs = Date.UTC(y, m - 1, d) - PKT_OFFSET_MS;
+    rangeStart = new Date(startMs);
+    rangeEnd = new Date(startMs + 24 * 60 * 60 * 1000 - 1);
+    targetDateStr = fromVal;
+  } else {
+    // Default: Today in PKT
+    const pktMidnightMs =
+      Date.UTC(nowPkt.getUTCFullYear(), nowPkt.getUTCMonth(), nowPkt.getUTCDate()) - PKT_OFFSET_MS;
+    rangeStart = new Date(pktMidnightMs);
+    rangeEnd = new Date(pktMidnightMs + 24 * 60 * 60 * 1000 - 1);
+    targetDateStr = todayStr;
+  }
+
+  // Fetch confirmed/non-voided invoices for this range with all line items and product details
+  const [invoices, salesReturns, customerPayments] = await Promise.all([
+    prisma.invoice.findMany({
+      where: {
+        invoiceDate: { gte: rangeStart, lte: rangeEnd },
+        documentStatus: { not: "VOIDED" },
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        salesman: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: {
+              include: {
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { invoiceDate: "desc" },
+    }),
+    prisma.salesReturn.findMany({
+      where: {
+        returnDate: { gte: rangeStart, lte: rangeEnd },
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: {
+              include: {
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { returnDate: "desc" },
+    }),
+    prisma.customerPayment.findMany({
+      where: {
+        paymentDate: { gte: rangeStart, lte: rangeEnd },
+      },
+      select: {
+        id: true,
+        amount: true,
+        paymentType: true,
+      },
+    }),
+  ]);
+
+  // Aggregate Sales totals
+  let grossSales = 0;
+  let cashSales = 0;
+  let creditSales = 0;
+  let totalDiscount = 0;
+  let totalTransportDiscount = 0;
+  let cashCollectedOnInvoices = 0;
+
+  for (const inv of invoices) {
+    const invTotal = Number(inv.total || 0);
+    grossSales += invTotal;
+    totalDiscount += Number(inv.discount || 0);
+    totalTransportDiscount += Number(inv.transportDiscount || 0);
+    cashCollectedOnInvoices += Number(inv.paidAmount || 0);
+
+    if (inv.saleType === "CASH") {
+      cashSales += invTotal;
+    } else {
+      creditSales += invTotal;
+    }
+  }
+
+  // Aggregate Sales Returns totals
+  let totalReturns = 0;
+  let cashRefunds = 0;
+  for (const ret of salesReturns) {
+    const retAmount = Number(ret.totalAmount || 0);
+    totalReturns += retAmount;
+    if (ret.refundType === "CASH") {
+      cashRefunds += retAmount;
+    }
+  }
+
+  const netSales = Math.max(0, grossSales - totalReturns);
+
+  // Customer payments received today
+  let directCustomerPayments = 0;
+  for (const p of customerPayments) {
+    if (p.paymentType === "CASH_REFUND") {
+      directCustomerPayments -= Number(p.amount || 0);
+    } else {
+      directCustomerPayments += Number(p.amount || 0);
+    }
+  }
+  const totalCashInflow = Math.max(0, cashCollectedOnInvoices + directCustomerPayments);
+
+  // Accumulative Products Sold aggregation
+  const productMap = {};
+
+  // 1. Process sold invoice items
+  for (const inv of invoices) {
+    for (const item of inv.items) {
+      const pId = item.productId;
+      if (!productMap[pId]) {
+        const prod = item.product;
+        productMap[pId] = {
+          productId: pId,
+          name: prod?.name || "Unknown Product",
+          sku: prod?.sku || "",
+          size: prod?.size || null,
+          categoryName: prod?.category?.name || "Uncategorized",
+          piecesPerCarton: prod?.piecesPerCarton || null,
+          unitPrice: Number(item.unitPrice || 0),
+          quantitySold: 0,
+          quantityReturned: 0,
+          netQuantity: 0,
+          grossRevenue: 0,
+          returnedRevenue: 0,
+          netRevenue: 0,
+        };
+      }
+      productMap[pId].quantitySold += Number(item.quantity || 0);
+      productMap[pId].grossRevenue += Number(item.totalPrice || 0);
+    }
+  }
+
+  // 2. Process return items
+  for (const ret of salesReturns) {
+    for (const item of ret.items) {
+      const pId = item.productId;
+      if (!productMap[pId]) {
+        const prod = item.product;
+        productMap[pId] = {
+          productId: pId,
+          name: prod?.name || "Unknown Product",
+          sku: prod?.sku || "",
+          size: prod?.size || null,
+          categoryName: prod?.category?.name || "Uncategorized",
+          piecesPerCarton: prod?.piecesPerCarton || null,
+          unitPrice: Number(item.unitPrice || 0),
+          quantitySold: 0,
+          quantityReturned: 0,
+          netQuantity: 0,
+          grossRevenue: 0,
+          returnedRevenue: 0,
+          netRevenue: 0,
+        };
+      }
+      productMap[pId].quantityReturned += Number(item.quantity || 0);
+      productMap[pId].returnedRevenue += Number(item.totalPrice || 0);
+    }
+  }
+
+  // 3. Finalize product statistics and carton breakdowns
+  let totalGrossPieces = 0;
+  let totalReturnedPieces = 0;
+  let totalNetPieces = 0;
+
+  const productList = Object.values(productMap).map((p) => {
+    p.netQuantity = p.quantitySold - p.quantityReturned;
+    p.netRevenue = Math.max(0, p.grossRevenue - p.returnedRevenue);
+    p.averagePrice = p.quantitySold > 0 ? p.grossRevenue / p.quantitySold : p.unitPrice;
+
+    // Cartons calculation if piecesPerCarton configured
+    if (p.piecesPerCarton && p.piecesPerCarton > 0) {
+      const cartons = Math.floor(p.netQuantity / p.piecesPerCarton);
+      const loosePieces = p.netQuantity % p.piecesPerCarton;
+      p.cartons = cartons;
+      p.loosePieces = loosePieces;
+      p.cartonDisplay = `${cartons} ctn${cartons !== 1 ? "s" : ""}${loosePieces > 0 ? `, ${loosePieces} pcs` : ""}`;
+    } else {
+      p.cartons = null;
+      p.loosePieces = null;
+      p.cartonDisplay = `${p.netQuantity} pcs`;
+    }
+
+    totalGrossPieces += p.quantitySold;
+    totalReturnedPieces += p.quantityReturned;
+    totalNetPieces += p.netQuantity;
+
+    return p;
+  });
+
+  // Sort products by net quantity sold descending
+  productList.sort((a, b) => b.netQuantity - a.netQuantity || b.netRevenue - a.netRevenue);
+
+  // Salesmen daily breakdown
+  const salesmanMap = {};
+  for (const inv of invoices) {
+    const sId = inv.salesmanId || "unassigned";
+    const sName = inv.salesman?.name || "Unassigned / Direct";
+    if (!salesmanMap[sId]) {
+      salesmanMap[sId] = {
+        salesmanId: inv.salesmanId,
+        salesmanName: sName,
+        invoiceCount: 0,
+        grossSales: 0,
+        returns: 0,
+        netSales: 0,
+      };
+    }
+    salesmanMap[sId].invoiceCount += 1;
+    salesmanMap[sId].grossSales += Number(inv.total || 0);
+  }
+
+  // Deduct returns attributed to salesmen
+  for (const ret of salesReturns) {
+    const inv = ret.invoiceId ? invoices.find((i) => i.id === ret.invoiceId) : null;
+    const sId = inv?.salesmanId || "unassigned";
+    if (salesmanMap[sId]) {
+      salesmanMap[sId].returns += Number(ret.totalAmount || 0);
+    }
+  }
+
+  const salesmenList = Object.values(salesmanMap).map((s) => ({
+    ...s,
+    netSales: Math.max(0, s.grossSales - s.returns),
+  })).sort((a, b) => b.netSales - a.netSales);
+
+  // Invoices summary list
+  const invoiceList = invoices.map((inv) => ({
+    id: inv.id,
+    invoiceNo: inv.invoiceNo,
+    invoiceDate: inv.invoiceDate,
+    customerName: inv.customer?.name || "Walk-in Cash Customer",
+    salesmanName: inv.salesman?.name || "-",
+    saleType: inv.saleType,
+    subtotal: Number(inv.subtotal),
+    discount: Number(inv.discount || 0),
+    transportDiscount: Number(inv.transportDiscount || 0),
+    total: Number(inv.total),
+    paidAmount: Number(inv.paidAmount),
+    balanceDue: Number(inv.balanceDue),
+    itemCount: inv.items.length,
+    totalPieces: inv.items.reduce((sum, it) => sum + it.quantity, 0),
+  }));
+
+  return {
+    date: targetDateStr,
+    from: rangeStart.toISOString(),
+    to: rangeEnd.toISOString(),
+    summary: {
+      totalSell: netSales,
+      grossSales,
+      totalReturns,
+      netSales,
+      cashSales,
+      creditSales,
+      cashCollectedOnInvoices,
+      totalCashInflow,
+      totalInvoices: invoices.length,
+      totalReturnsCount: salesReturns.length,
+      // Accumulative Products Sold
+      accumulativeProductsSold: Math.max(0, totalNetPieces),
+      totalGrossPieces,
+      totalReturnedPieces,
+      uniqueProductsCount: productList.length,
+    },
+    productsSold: productList,
+    salesmen: salesmenList,
+    invoices: invoiceList,
+  };
+}
+
+async function getDailySummary(dateString) {
+  return getSummary({ date: dateString });
+}
+
 module.exports = {
   getDashboardMetrics,
+  getSummary,
+  getDailySummary,
   salesByDay,
   salesBySalesman,
   purchasesByDay,

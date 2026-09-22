@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Categories from "./pages/Categories";
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
+import CustomerInvoices from "./pages/CustomerInvoices";
 import Suppliers from "./pages/Suppliers";
 import Purchases from "./pages/Purchases";
 import Invoices from "./pages/Invoices";
@@ -122,6 +123,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN", "STAFF"]}>
                 <Customers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer-invoices"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "STAFF"]}>
+                <CustomerInvoices />
               </ProtectedRoute>
             }
           />

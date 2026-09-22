@@ -157,7 +157,7 @@ const Layout = ({ children }) => {
         {/* Content Box */}
         <main className="flex-1 overflow-y-auto px-6 py-8 relative space-y-4">
           {periodClosedError && (
-            <div className="p-4 bg-rose-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-bounce-once">
+            <div className="p-4 bg-rose-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-bounce-once no-print">
               <div className="flex items-center space-x-3">
                 <span className="text-xl">🔒</span>
                 <div className="font-semibold text-sm">{periodClosedError}</div>

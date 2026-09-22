@@ -62,10 +62,58 @@ const activateCustomer = async (id) => {
     });
 };
 
-const getCustomerLedger = (customerId) => {
-    return prisma.customerLedger.findMany({
+const getCustomerLedger = async (customerId) => {
+    const entries = await prisma.customerLedger.findMany({
         where: { customerId: Number(customerId) },
         orderBy: { createdAt: "asc" }
+    });
+
+    const invoiceIds = entries.filter(e => e.referenceType === "INVOICE").map(e => e.referenceId);
+    const returnIds = entries.filter(e => e.referenceType === "RETURN").map(e => e.referenceId);
+
+    const [invoices, returns] = await Promise.all([
+        invoiceIds.length > 0
+            ? prisma.invoice.findMany({ where: { id: { in: invoiceIds } }, select: { id: true, invoiceNo: true } })
+            : [],
+        returnIds.length > 0
+            ? prisma.salesReturn.findMany({ where: { id: { in: returnIds } }, select: { id: true, returnNo: true } })
+            : []
+    ]);
+
+    const invoiceMap = new Map(invoices.map(i => [i.id, i.invoiceNo]));
+    const returnMap = new Map(returns.map(r => [r.id, r.returnNo]));
+
+    return entries.map(entry => {
+        let referenceDocNo = null;
+        let displayDocNo = null;
+
+        if (entry.referenceType === "INVOICE") {
+            referenceDocNo = invoiceMap.get(entry.referenceId);
+            if (!referenceDocNo && entry.description) {
+                const match = entry.description.match(/INV-\d+/i);
+                if (match) referenceDocNo = match[0];
+            }
+            if (referenceDocNo) {
+                const numMatch = referenceDocNo.match(/INV-0*(\d+)/i);
+                displayDocNo = numMatch ? numMatch[1] : referenceDocNo;
+            }
+        } else if (entry.referenceType === "RETURN") {
+            referenceDocNo = returnMap.get(entry.referenceId);
+            if (!referenceDocNo && entry.description) {
+                const match = entry.description.match(/RET-\d+/i);
+                if (match) referenceDocNo = match[0];
+            }
+            if (referenceDocNo) {
+                const numMatch = referenceDocNo.match(/RET-0*(\d+)/i);
+                displayDocNo = numMatch ? numMatch[1] : referenceDocNo;
+            }
+        }
+
+        return {
+            ...entry,
+            referenceDocNo,
+            displayDocNo
+        };
     });
 };
 

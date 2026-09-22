@@ -392,8 +392,23 @@ async function postInvoiceFinancialsAndStock(tx, invoice, validatedItems, { cust
   );
 }
 
+// Helper: extract raw user note if description is packed JSON
+function extractUserNote(description) {
+  if (!description) return "";
+  if (typeof description === "string" && description.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(description);
+      if (parsed && typeof parsed === "object" && "itemDiscounts" in parsed) {
+        return parsed.note || "";
+      }
+    } catch {}
+  }
+  return description;
+}
+
 // Helper: pack user description and item discount metadata without altering DB schema
 function packDescription(userDescription, items) {
+  const cleanNote = extractUserNote(userDescription);
   const itemDiscounts = (items || [])
     .filter((it) => it.discountType)
     .map((it) => ({
@@ -403,11 +418,11 @@ function packDescription(userDescription, items) {
     }));
 
   if (itemDiscounts.length === 0) {
-    return userDescription || null;
+    return cleanNote || null;
   }
 
   return JSON.stringify({
-    note: userDescription || "",
+    note: cleanNote || "",
     itemDiscounts,
   });
 }
@@ -799,8 +814,8 @@ async function deleteDraftInvoice(id) {
 /**
  * Returns all invoices matching filters, ordered by creation date desc.
  */
-function getAllInvoices({ where, skip, take }) {
-  return prisma.invoice.findMany({
+async function getAllInvoices({ where, skip, take }) {
+  const invoices = await prisma.invoice.findMany({
     where,
     skip,
     take,
@@ -840,6 +855,7 @@ function getAllInvoices({ where, skip, take }) {
       createdAt: "desc",
     },
   });
+  return invoices.map(unpackInvoiceData);
 }
 
 /**
@@ -852,8 +868,8 @@ function countInvoices(where) {
 /**
  * Fetches a single invoice details including its line items (joined with product info) and customer.
  */
-function getInvoiceById(id) {
-  return prisma.invoice.findUnique({
+async function getInvoiceById(id) {
+  const invoice = await prisma.invoice.findUnique({
     where: { id: Number(id) },
     include: {
       items: {

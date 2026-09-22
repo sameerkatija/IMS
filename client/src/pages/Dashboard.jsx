@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
-import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database, RotateCcw } from "lucide-react";
+import { LayoutDashboard, TrendingUp, AlertTriangle, Users, Truck, ArrowUpRight, DollarSign, Wallet, ArrowDownRight, Package, Database, RotateCcw, Calendar } from "lucide-react";
 
 const COLORS = ["#0284c7", "#38bdf8", "#0ea5e9", "#7dd3fc", "#bae6fd"];
 
@@ -110,7 +110,16 @@ const Dashboard = () => {
       icon: TrendingUp,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
-      link: "/invoices"
+      link: "/reports?tab=summary"
+    },
+    {
+      title: "Products Sold Today",
+      value: `${(metrics.todayProductsSold || 0).toLocaleString()} pcs`,
+      description: "Accumulative units sold across all products today",
+      icon: Package,
+      color: "text-indigo-500",
+      bg: "bg-indigo-500/10",
+      link: "/reports?tab=summary"
     },
     {
       title: "Today's Sales Return",
@@ -199,25 +208,34 @@ const Dashboard = () => {
             Welcome back, {user?.name || "operator"}. Here is today's summary for Sameer Distributors.
           </p>
         </div>
-        {user?.role === "ADMIN" && (
-          <button
-            onClick={handleBackup}
-            disabled={backingUp}
-            className="flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg hover:shadow-sky-500/10 active:scale-[0.98] transition-all duration-200"
+        <div className="flex items-center gap-3">
+          <Link
+            to="/reports?tab=summary"
+            className="flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg hover:shadow-sky-500/10 active:scale-[0.98] transition-all duration-200"
           >
-            {backingUp ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Backing up...
-              </>
-            ) : (
-              <>
-                <Database className="mr-2" size={16} />
-                Backup Database
-              </>
-            )}
-          </button>
-        )}
+            <Calendar className="mr-2" size={16} />
+            Summary
+          </Link>
+          {user?.role === "ADMIN" && (
+            <button
+              onClick={handleBackup}
+              disabled={backingUp}
+              className="flex items-center justify-center px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white text-sm font-semibold rounded-xl border border-slate-700/60 shadow-sm hover:shadow active:scale-[0.98] transition-all duration-200"
+            >
+              {backingUp ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Backing up...
+                </>
+              ) : (
+                <>
+                  <Database className="mr-2" size={16} />
+                  Backup Database
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards Grid */}

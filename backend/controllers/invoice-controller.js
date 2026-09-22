@@ -173,9 +173,10 @@ async function deleteDraftInvoice(req, res) {
  */
 async function listInvoices(req, res) {
   try {
-    const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 10);
-    const skip = (page - 1) * limit;
+    const isAll = req.query.limit === "all";
+    const page = isAll ? 1 : Number(req.query.page || 1);
+    const limit = isAll ? 10000 : Number(req.query.limit || 10);
+    const skip = isAll ? 0 : (page - 1) * limit;
 
     const where = {};
 
@@ -196,19 +197,40 @@ async function listInvoices(req, res) {
     }
 
     if (req.query.search) {
-      where.invoiceNo = {
-        contains: req.query.search,
-        mode: "insensitive",
-      };
+      const searchStr = req.query.search.trim();
+      where.OR = [
+        {
+          invoiceNo: {
+            contains: searchStr,
+            mode: "insensitive",
+          },
+        },
+        {
+          customer: {
+            name: {
+              contains: searchStr,
+              mode: "insensitive",
+            },
+          },
+        },
+      ];
     }
 
-    if (req.query.from || req.query.to) {
+    if (req.query.date) {
+      const dateStr = String(req.query.date).trim();
+      where.invoiceDate = {
+        gte: new Date(`${dateStr}T00:00:00.000`),
+        lte: new Date(`${dateStr}T23:59:59.999`),
+      };
+    } else if (req.query.from || req.query.to) {
       where.invoiceDate = {};
       if (req.query.from) {
-        where.invoiceDate.gte = new Date(req.query.from);
+        const fromStr = String(req.query.from).trim();
+        where.invoiceDate.gte = fromStr.includes("T") ? new Date(fromStr) : new Date(`${fromStr}T00:00:00.000`);
       }
       if (req.query.to) {
-        where.invoiceDate.lte = new Date(req.query.to);
+        const toStr = String(req.query.to).trim();
+        where.invoiceDate.lte = toStr.includes("T") ? new Date(toStr) : new Date(`${toStr}T23:59:59.999`);
       }
     }
 

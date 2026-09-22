@@ -5,6 +5,20 @@ import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { formatCurrency, formatCurrencyNoDecimals } from "../utils/format";
 
+// Helper: extract human-readable note if description holds packed metadata
+const extractCleanNote = (desc) => {
+  if (!desc) return "";
+  if (typeof desc === "string" && desc.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(desc);
+      if (parsed && typeof parsed === "object" && "itemDiscounts" in parsed) {
+        return parsed.note || "";
+      }
+    } catch {}
+  }
+  return desc;
+};
+
 const Invoices = () => {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
@@ -31,6 +45,10 @@ const Invoices = () => {
   const [searchNo, setSearchNo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [docStatusFilter, setDocStatusFilter] = useState("all");
+  const [dateMode, setDateMode] = useState("all"); // "all" | "today" | "yesterday" | "single" | "range"
+  const [singleDate, setSingleDate] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   // Create / Edit Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -87,9 +105,24 @@ const Invoices = () => {
     try {
       setLoading(true);
       let queryParams = `?page=${page}&limit=${limit}`;
-      if (searchNo.trim()) queryParams += `&search=${encodeURIComponent(searchNo)}`;
+      if (searchNo.trim()) queryParams += `&search=${encodeURIComponent(searchNo.trim())}`;
       if (statusFilter !== "all") queryParams += `&status=${statusFilter}`;
       if (docStatusFilter !== "all") queryParams += `&documentStatus=${docStatusFilter}`;
+
+      if (dateMode === "today") {
+        const todayStr = new Date().toISOString().split("T")[0];
+        queryParams += `&date=${todayStr}`;
+      } else if (dateMode === "yesterday") {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split("T")[0];
+        queryParams += `&date=${yStr}`;
+      } else if (dateMode === "single" && singleDate) {
+        queryParams += `&date=${singleDate}`;
+      } else if (dateMode === "range") {
+        if (fromDate) queryParams += `&from=${fromDate}`;
+        if (toDate) queryParams += `&to=${toDate}`;
+      }
 
       const response = await api.get(`/api/invoice${queryParams}`);
       if (response.data && response.data.type === "success") {
@@ -121,7 +154,7 @@ const Invoices = () => {
 
   useEffect(() => {
     fetchInvoices();
-  }, [page, searchNo, statusFilter, docStatusFilter]);
+  }, [page, searchNo, statusFilter, docStatusFilter, dateMode, singleDate, fromDate, toDate]);
 
   useEffect(() => {
     fetchDependencies();
@@ -272,7 +305,19 @@ const Invoices = () => {
         setTransportDiscountType("PKR");
         setPaidAmount(fullInv.paidAmount ? fullInv.paidAmount.toString() : "0");
         setCreditApplied(fullInv.creditApplied ? fullInv.creditApplied.toString() : "0");
-        setDescription(fullInv.description || "");
+        setDescription(extractCleanNote(fullInv.description));
+
+        let legacyMetaMap = {};
+        if (fullInv.description && typeof fullInv.description === "string" && fullInv.description.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(fullInv.description);
+            if (parsed && Array.isArray(parsed.itemDiscounts)) {
+              parsed.itemDiscounts.forEach((d) => {
+                legacyMetaMap[d.productId] = d;
+              });
+            }
+          } catch {}
+        }
 
         if (fullInv.items && fullInv.items.length > 0) {
           const loadedItems = fullInv.items.map((it) => {
@@ -280,14 +325,22 @@ const Invoices = () => {
             const unitP = Number(it.unitPrice) || 0;
             const totalP = Number(it.totalPrice) || 0;
             const itemDisc = Math.max(0, (qty * unitP) - totalP);
+            const meta = legacyMetaMap[it.productId];
+            const discountType = it.discountType || (meta ? meta.discountType : "PER_PIECE");
+            let discountValue = "0";
+            if (it.discountValue !== undefined && it.discountValue !== null) {
+              discountValue = it.discountValue.toString();
+            } else if (meta && meta.discountValue !== undefined) {
+              discountValue = meta.discountValue.toString();
+            } else if (qty > 0) {
+              discountValue = (itemDisc / qty).toString();
+            }
             return {
               productId: it.productId.toString(),
               quantity: it.quantity.toString(),
               unitPrice: it.unitPrice.toString(),
-              discountType: it.discountType || "PER_PIECE",
-              discountValue: it.discountValue !== undefined && it.discountValue !== null
-                ? it.discountValue.toString()
-                : (qty > 0 ? (itemDisc / qty).toString() : "0"),
+              discountType,
+              discountValue,
             };
           });
           setItems(loadedItems);
@@ -482,37 +535,128 @@ const Invoices = () => {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by Invoice No (e.g. INV-0001)..."
-            value={searchNo}
-            onChange={(e) => setSearchNo(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-          />
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={docStatusFilter}
-            onChange={(e) => setDocStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-          >
-            <option value="all">All Documents</option>
-            <option value="DRAFT">Drafts (Editable)</option>
-            <option value="POSTED">Confirmed (Locked)</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-          >
-            <option value="all">All Payment Status</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="UNPAID">Unpaid</option>
-          </select>
+      <div className="flex flex-col gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <div className="relative flex-1 w-full">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by Customer Name or Invoice No..."
+              value={searchNo}
+              onChange={(e) => {
+                setSearchNo(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Date Filter Mode Selector */}
+            <div className="flex items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
+              <Calendar size={14} className="text-slate-400 mr-2 shrink-0" />
+              <select
+                value={dateMode}
+                onChange={(e) => {
+                  setDateMode(e.target.value);
+                  setPage(1);
+                }}
+                className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="single">Specific Date</option>
+                <option value="range">Date Range</option>
+              </select>
+            </div>
+
+            {/* Single Date Picker */}
+            {dateMode === "single" && (
+              <div className="flex items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300">
+                <input
+                  type="date"
+                  value={singleDate}
+                  onChange={(e) => {
+                    setSingleDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-300 cursor-pointer"
+                />
+              </div>
+            )}
+
+            {/* Date Range Pickers */}
+            {dateMode === "range" && (
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-500">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-300 cursor-pointer"
+                />
+                <span className="text-slate-400">to</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-300 cursor-pointer"
+                />
+              </div>
+            )}
+
+            <select
+              value={docStatusFilter}
+              onChange={(e) => {
+                setDocStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-xs font-medium cursor-pointer"
+            >
+              <option value="all">All Documents</option>
+              <option value="DRAFT">Drafts (Editable)</option>
+              <option value="POSTED">Confirmed (Locked)</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-1 focus:ring-sky-500 outline-none text-xs font-medium cursor-pointer"
+            >
+              <option value="all">All Payment Status</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIALLY_PAID">Partially Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+
+            {(searchNo || dateMode !== "all" || statusFilter !== "all" || docStatusFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchNo("");
+                  setDateMode("all");
+                  setSingleDate("");
+                  setFromDate("");
+                  setToDate("");
+                  setStatusFilter("all");
+                  setDocStatusFilter("all");
+                  setPage(1);
+                }}
+                className="text-xs text-rose-500 hover:text-rose-600 font-medium px-2 py-1.5 transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1934,11 +2078,11 @@ const Invoices = () => {
                 )}
 
                 {/* ===== FOOTER NOTES ===== */}
-                {selectedInvoice.description && (
+                {extractCleanNote(selectedInvoice.description) ? (
                   <div className="border-t border-slate-200 dark:border-slate-800 print:border-slate-200 text-slate-500 dark:text-slate-400" style={{ marginTop: '12px', paddingTop: '6px', fontSize: '11px', fontStyle: 'italic' }}>
-                    Notes: {selectedInvoice.description}
+                    Notes: {extractCleanNote(selectedInvoice.description)}
                   </div>
-                )}
+                ) : null}
 
                 <div className="border-t border-dashed border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-400" style={{ textAlign: 'center', marginTop: '16px', fontSize: '10px', paddingTop: '8px' }}>
                   Thank you for your business! | Sameer Distributors | 03342320521

@@ -252,8 +252,28 @@ async function salesByCategory(req, res) {
   }
 }
 
+async function getSummary(req, res) {
+  try {
+    const { from, to, date } = req.query;
+    const data = await reportModel.getSummary({ from, to, date });
+    return res.status(200).json({
+      type: "success",
+      data,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      type: "error",
+      message: err.message || "Failed to retrieve summary report.",
+    });
+  }
+}
+
 module.exports = {
   getDashboardMetrics,
+  getSummary,
+  getDailySummary: getSummary,
+  dailySummary: getSummary,
   salesByDay,
   salesBySalesman,
   purchasesByDay,

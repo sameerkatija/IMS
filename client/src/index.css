@@ -66,73 +66,150 @@ html.dark ::-webkit-scrollbar-thumb {
 /* Print CSS for Thermal (80mm) and A4 formats */
 @page {
   size: A4 portrait;
-  margin: 0; /* Let padding on print-area control page margins */
+  margin: 10mm 8mm 12mm 8mm;
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt;
+    font-family: Arial, sans-serif;
+    color: #475569;
+  }
+  @bottom-left {
+    content: "Sameer Distributors • Sales Summary Statement";
+    font-size: 8pt;
+    font-family: Arial, sans-serif;
+    color: #94a3b8;
+  }
 }
 
 @media print {
-  /* Force white page background */
+  /* Force white page background and unconstrained height for natural multi-page pagination */
   html, body {
     background-color: #fff !important;
     background: #fff !important;
     color: #000 !important;
-    min-height: unset !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Hide everything on the page */
-  body * {
-    visibility: hidden !important;
+  /* Reset layout constraints on ancestors so content flows onto multiple pages */
+  #root,
+  .h-screen,
+  .min-h-screen,
+  .h-full,
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  main {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
   }
 
-  /* Show only the print content */
-  .print-area, .print-area *, .thermal-receipt, .thermal-receipt * {
-    visibility: visible !important;
+  /* For modal overlays during print, neutralize backdrop locks */
+  .fixed.inset-0,
+  .fixed {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
   }
 
-  /* Standard A4 Print Sheet positioning and margins */
+  /* Completely remove non-printed UI elements from document flow */
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  /* Standard A4 Print Sheet: Flow naturally across pages */
   .print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
-    padding: 15mm 15mm !important; /* Elegant margin/padding around the printed bill */
+    margin: 0 auto !important;
+    padding: 0 !important;
     background-color: #fff !important;
     color: #000 !important;
     box-shadow: none !important;
+    border: none !important;
     font-family: Arial, sans-serif !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
-  /* Reset all dark mode backgrounds and texts to clean print values */
+  /* Multi-page table formatting */
+  .print-area table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  /* Repeat table headers on top of page 2, 3, etc. */
+  .print-area table thead {
+    display: table-header-group !important;
+  }
+
+  /* Only show totals at the absolute end of the table (never repeat on page 1) */
+  .print-area table tfoot {
+    display: table-row-group !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Prevent individual rows from splitting horizontally across page breaks */
   .print-area table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     background-color: #fff !important;
     color: #000 !important;
   }
+
   .print-area table thead tr {
-    background-color: #f1f5f9 !important; /* light gray header background */
+    background-color: #f1f5f9 !important;
     color: #000 !important;
   }
-  .print-area table th, .print-area table td {
+
+  .print-area table th,
+  .print-area table td {
     color: #000 !important;
-    border-color: #ccc !important;
+    border-color: #000 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
-  
+
   .print-area h1, 
   .print-area h2, 
   .print-area h3, 
   .print-area p, 
   .print-area span, 
   .print-area strong, 
-  .print-area div,
-  .print-area td,
-  .print-area th {
+  .print-area div {
     color: #000 !important;
     background-color: transparent !important;
   }
 
+  /* Prevent awkward page breaks inside key summary blocks or notices */
+  .break-inside-avoid,
+  .print-header-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   /* Thermal 80mm roll custom styles */
   .thermal-receipt {
-    position: absolute !important;
+    position: relative !important;
     left: 0 !important;
     top: 0 !important;
     width: 80mm !important;
@@ -143,6 +220,7 @@ html.dark ::-webkit-scrollbar-thumb {
     line-height: 1.2 !important;
     background-color: #fff !important;
     color: #000 !important;
+    margin: 0 auto !important;
   }
   
   .thermal-receipt table {

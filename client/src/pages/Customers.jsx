@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { Users, Plus, Edit2, Search, FileText, Phone, MapPin, ShieldCheck } from "lucide-react";
+import { Users, Plus, Edit2, Search, FileText, Phone, MapPin, ShieldCheck, Receipt } from "lucide-react";
 import Toast from "../components/Toast";
 
 const Customers = () => {
@@ -317,8 +317,16 @@ const Customers = () => {
                         <button
                           onClick={() => navigate(`/reports?tab=customer-ledger&customerId=${c.id}`)}
                           className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg border border-sky-200 dark:border-sky-900/40 transition-colors"
+                          title="View Customer Ledger"
                         >
                           <FileText size={12} className="mr-1" /> Ledger
+                        </button>
+                        <button
+                          onClick={() => navigate(`/customer-invoices?customerId=${c.id}`)}
+                          className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-900/40 transition-colors"
+                          title="View Customer Invoices"
+                        >
+                          <Receipt size={12} className="mr-1" /> Invoices
                         </button>
                       </td>
                     </tr>
